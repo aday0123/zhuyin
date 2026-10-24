@@ -1,0 +1,48 @@
+{
+ "version": "f2195a570455",
+ "file": "g2pw.q.onnx",
+ "size": 159287362,
+ "sha256": "f2195a57045556d8ba774a8c7b55a2cc02c5e50343f97692217ff3d2208e3d6a",
+ "parts": [
+  {
+   "name": "g2pw.q.onnx.part00",
+   "size": 24000000,
+   "sha256": "7bc594c1010b6fbd7ab88cdad43610a21adca1922f3a086b3d46077ec290449a"
+  },
+  {
+   "name": "g2pw.q.onnx.part01",
+   "size": 24000000,
+   "sha256": "6771cdd3eb16e3a405e1c05214b0ae28e5d1d5deaa6fb4b4e7c3f5898f7f14cb"
+  },
+  {
+   "name": "g2pw.q.onnx.part02",
+   "size": 24000000,
+   "sha256": "89930d3b2a56dd2febeea7bee10770e9b89645b5ba365533d5eede7be32ba6af"
+  },
+  {
+   "name": "g2pw.q.onnx.part03",
+   "size": 24000000,
+   "sha256": "289aeb65437242e7fe837cea7eadf480d59b8d1c4470f543407409a92a7d71b9"
+  },
+  {
+   "name": "g2pw.q.onnx.part04",
+   "size": 24000000,
+   "sha256": "d1af6191ad3fe047c4a2ba61c93249af3ffccb7c2935fdcf301656db6e66a787"
+  },
+  {
+   "name": "g2pw.q.onnx.part05",
+   "size": 24000000,
+   "sha256": "3cc85e9f49a7aa48fa6a70454070fe97326656e73c7dfa9ab701befd0b769525"
+  },
+  {
+   "name": "g2pw.q.onnx.part06",
+   "size": 15287362,
+   "sha256": "2a38ebd00eba29684317c5566623aafbd83d194f18fd40b817337dd2e3a855d1"
+  }
+ ],
+ "created": "2026-10-24 17:22:30",
+ "verify": {
+  "polyphones": 235,
+  "diff": 0
+ }
+}

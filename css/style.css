@@ -1,0 +1,152 @@
+@font-face {
+  font-family: "BpmfZihiKai";
+  src: url("../fonts/BpmfZihiKaiStd-Regular.woff2") format("woff2");
+  font-display: block;
+}
+:root {
+  --ink: #1f3d33;        /* 作業簿墨綠 */
+  --ink-soft: #55705f;
+  --paper: #ffffff;
+  --desk: #e9efe9;       /* 桌面淡綠灰 */
+  --rule: #c6d9cb;       /* 格線綠 */
+  --pen: #c9382c;        /* 老師紅筆 */
+  --marker: #f6df5c;     /* 螢光筆 */
+  --edit: #1d7a4c;       /* 改過的讀音 */
+  --poly-bg: #fff7d1;    /* 破音字：淺黃底 */
+  --poly-line: #d9b44a;  /* 破音字：框線 */
+  --edit-bg: #e3f4ea;
+  --focus: #2b6cb0;
+  --han-font: "標楷體", "DFKai-SB", "BiauKai", "Kaiti TC", "STKaiti", "TW-Kai", "Noto Serif TC", serif;
+  --ui-font: "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", "Heiti TC", sans-serif;
+  --fs: 34px;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--desk); color: var(--ink); font: 16px/1.6 var(--ui-font); }
+button, select, input, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+/* ---- 頂部 ---- */
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 24px; }
+.brand { margin: 0; font: 700 1.5rem/1.2 var(--han-font); letter-spacing: .08em; }
+.model-chip { margin: 0; font-size: .875rem; padding: 4px 12px; border-radius: 999px; background: #fff; border: 1px solid var(--rule); color: var(--ink-soft); }
+.model-chip[data-state="ready"] { color: var(--edit); border-color: #9cc8a8; }
+.model-chip[data-state="error"] { color: var(--pen); border-color: #e9a39c; }
+
+/* ---- 版面 ---- */
+.layout { display: grid; grid-template-columns: minmax(280px, 360px) 1fr; gap: 24px; padding: 0 24px 24px; align-items: start; }
+.input-pane { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 14px; }
+.field-label { font-weight: 700; }
+textarea { width: 100%; min-height: 260px; resize: vertical; padding: 12px 14px; border: 1px solid var(--rule); border-radius: 6px; background: #fff; font: 18px/1.7 var(--han-font); }
+.actions { display: flex; gap: 10px; }
+button { cursor: pointer; border: 1px solid var(--ink); background: #fff; border-radius: 6px; padding: 8px 18px; }
+button.primary { background: var(--ink); color: #fff; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+.opts { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px 18px; }
+.opts legend { font-weight: 700; margin-bottom: 6px; padding: 0; }
+.opts label { display: flex; align-items: center; gap: 6px; }
+select { border: 1px solid var(--rule); border-radius: 6px; padding: 4px 8px; background: #fff; }
+.legend { font-size: .875rem; color: var(--ink-soft); }
+.legend p { margin: 2px 0; display: flex; align-items: center; gap: 8px; }
+.legend .hint { margin-top: 6px; }
+.swatch { font: 18px/1.3 var(--han-font); color: var(--ink); padding: 0 3px; }
+.sw-check { background: var(--poly-bg); box-shadow: inset 0 0 0 2px var(--pen); }
+.swatch { border-radius: 4px; padding: 0 4px; }
+.sw-poly { background: var(--poly-bg); box-shadow: inset 0 0 0 1.5px var(--poly-line); }
+.sw-edit { color: var(--edit); background: var(--edit-bg); box-shadow: inset 0 0 0 1.5px var(--edit); }
+.download { background: #fff; border: 1px solid var(--rule); border-left: 4px solid var(--pen); border-radius: 6px; padding: 12px 14px; }
+.download p { margin: 0 0 10px; }
+
+/* ---- 作業紙 ---- */
+.sheet-pane { min-width: 0; }
+.stats { margin: 0 0 8px; min-height: 1.6em; font-size: .9rem; color: var(--ink-soft); }
+.sheet { background: var(--paper); border-radius: 4px; box-shadow: 0 1px 0 var(--rule), 0 0 0 1px var(--rule); padding: 40px 48px; min-height: 60vh; font-size: var(--fs); }
+.sheet .empty { font: 16px/1.6 var(--ui-font); color: var(--ink-soft); }
+.ln { margin: 0 0 .25em; line-height: 1; min-height: 1.75em; display: flex; flex-wrap: wrap; align-items: center; row-gap: .25em; }
+.ln.blank { min-height: 1em; }
+
+/* 一個字 = 國字 + 右側直排注音 */
+.cell { display: inline-flex; align-items: center; height: 1.75em; position: relative; border-radius: 3px; }
+.cell .han { font-family: var(--han-font); font-size: 1em; line-height: 1; width: 1em; text-align: center; }
+.cell .zy { font-family: var(--han-font); font-size: .36em; width: 1.5em; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; color: var(--ink); padding-right: .4em; }
+.zy i { font-style: normal; display: block; position: relative; height: 1.02em; }
+.zy .tn { position: absolute; left: 100%; top: .28em; font-weight: 400; margin-left: .05em; }
+.zy .qs { display: block; height: .55em; line-height: .3; text-align: center; }
+.cell.punct .zy { visibility: hidden; }
+.grp { display: inline-flex; align-items: center; }
+.raw { font-family: var(--han-font); white-space: pre; }
+
+.cell[tabindex] { cursor: pointer; }
+.cell[tabindex]:hover .han { color: var(--pen); }
+.cell.edited .zy { color: var(--edit); font-weight: 700; }
+.sheet[data-mark="all"] .cell.poly { background: var(--poly-bg); box-shadow: inset 0 0 0 1.5px var(--poly-line); }
+.sheet[data-mark] .cell.check { background: var(--poly-bg); box-shadow: inset 0 0 0 2px var(--pen); }
+
+/* 字型模式：字嗨注音標楷，注音由字型本身畫出 */
+.sheet.fontmode .ln { font-family: "BpmfZihiKai", var(--han-font); line-height: 1.45; min-height: 1.45em; }
+.sheet.fontmode .raw { font-family: "BpmfZihiKai", var(--han-font); }
+.fc { cursor: pointer; border-radius: 4px; margin: 0 .04em; }
+.fc:hover { color: var(--pen); }
+
+.sheet[data-mark="all"] .fc.poly { background: var(--poly-bg); box-shadow: inset 0 0 0 1.5px var(--poly-line); }
+.sheet[data-mark] .fc.check { background: var(--poly-bg); box-shadow: inset 0 0 0 2px var(--pen); }
+.sheet[data-mark] .fc.edited, .sheet[data-mark] .cell.edited { background: var(--edit-bg); box-shadow: inset 0 0 0 1.5px var(--edit); }
+.sheet[data-mark] .fc.edited, .sheet[data-mark] .cell.edited .zy { color: var(--edit); }
+.fc.nofont { text-decoration: underline wavy var(--pen) !important; text-decoration-thickness: 1.5px !important; }
+.sheet .fc.active, .sheet .cell.active { box-shadow: 0 0 0 3px var(--focus); }
+.sw-nofont { text-decoration: underline wavy var(--pen); }
+.copytip { background: #fff; border: 1px solid var(--rule); border-left: 4px solid var(--edit); border-radius: 6px; padding: 10px 14px; font-size: .9rem; }
+.copytip p { margin: 0 0 6px; }
+.pop-list button small { margin-left: 8px; font: 12px var(--ui-font); color: var(--ink-soft); }
+
+/* ---- 下載進度 ---- */
+.progress { position: fixed; inset: 0; background: rgba(31, 61, 51, .35); display: grid; place-items: center; padding: 16px; z-index: 20; }
+.progress-card { background: #fff; border-radius: 8px; padding: 24px 28px; width: min(440px, 100%); }
+.progress-card h2 { margin: 0 0 14px; font-size: 1.15rem; }
+.track { height: 10px; background: var(--desk); border-radius: 999px; overflow: hidden; }
+.fill { height: 100%; width: 0; background: var(--ink); transition: width .2s linear; }
+.progress-card p { margin: 10px 0 0; }
+.progress-card .sub { font-size: .85rem; color: var(--ink-soft); }
+
+/* ---- 選讀音小視窗 ---- */
+.pop { position: absolute; z-index: 30; background: #fff; border: 1px solid var(--rule); border-radius: 8px; box-shadow: 0 6px 24px rgba(31, 61, 51, .18); padding: 12px; width: 240px; }
+.pop-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+.pop-char { font: 32px/1 var(--han-font); }
+.pop-ctx { font: 15px/1.4 var(--han-font); color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pop-list { display: flex; flex-direction: column; gap: 4px; }
+.pop-list button { display: flex; justify-content: space-between; align-items: center; text-align: left; padding: 6px 10px; border-color: var(--rule); font: 20px/1.2 var(--han-font); }
+.pop-list button[aria-pressed="true"] { border-color: var(--ink); background: #eef5f0; font-weight: 700; }
+.pop-list .pct { font: 12px var(--ui-font); color: var(--ink-soft); }
+.pop-custom { display: flex; gap: 6px; align-items: center; margin-top: 10px; font-size: .85rem; }
+.pop-custom input { width: 0; flex: 1; border: 1px solid var(--rule); border-radius: 6px; padding: 4px 6px; font: 18px var(--han-font); }
+.pop-custom button { padding: 4px 10px; }
+.pop-reset { margin-top: 8px; width: 100%; border-color: var(--rule); font-size: .85rem; }
+
+.foot { padding: 8px 24px 32px; font-size: .85rem; color: var(--ink-soft); }
+.foot p { margin: 4px 0; }
+.foot a { color: inherit; }
+.foot-tools { display: flex; gap: 16px; flex-wrap: wrap; }
+.linkish { border: 0; background: none; padding: 0; text-decoration: underline; color: inherit; }
+
+@media (max-width: 820px) {
+  .layout { grid-template-columns: 1fr; padding: 0 16px 16px; }
+  .bar, .foot { padding-left: 16px; padding-right: 16px; }
+  .input-pane { position: static; }
+  .sheet { padding: 24px 18px; }
+  textarea { min-height: 180px; }
+}
+@media (prefers-reduced-motion: reduce) { .fill { transition: none; } }
+
+/* ---- 列印：只印作業紙，不印標示 ---- */
+@media print {
+  @page { size: A4; margin: 15mm; }
+  body { background: #fff; }
+  .bar, .input-pane, .stats, .foot, .pop, .progress { display: none !important; }
+  .layout { display: block; padding: 0; }
+  .sheet { box-shadow: none; padding: 0; min-height: 0; }
+  .cell { background: none !important; box-shadow: none !important; }
+  .cell .han, .fc { text-decoration: none !important; color: #000 !important; background: none !important; box-shadow: none !important; }
+  .cell .zy, .raw { color: #000 !important; font-weight: 400 !important; }
+  .ln { break-inside: avoid; }
+}

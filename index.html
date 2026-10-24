@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>注音校對簿</title>
+<meta name="description" content="貼上文章，自動加注音並判斷破音字。模型在你的瀏覽器裡執行，文字不會上傳。">
+<!-- 讓 GitHub Pages 也能開啟多執行緒（加快推論）；必須是第一個載入的腳本 -->
+<script src="coi-serviceworker.min.js"></script>
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%231f3d33'/%3E%3Ctext x='26' y='46' font-size='34' fill='white' font-family='serif'%3E%E6%B3%A8%3C/text%3E%3Ctext x='50' y='30' font-size='13' fill='%23e05a4f'%3E%E3%84%93%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+<header class="bar">
+  <h1 class="brand">注音校對簿</h1>
+  <p class="model-chip" id="modelChip" data-state="idle">檢查模型中…</p>
+</header>
+
+<main class="layout">
+  <section class="input-pane" aria-label="輸入文章">
+    <label class="field-label" for="src">貼上文章</label>
+    <textarea id="src" spellcheck="false" placeholder="把課文、短文或學習單文字貼在這裡，每一行會照原樣排版。"></textarea>
+    <div class="actions">
+      <button id="runBtn" class="primary" type="button">加注音</button>
+      <button id="copyBtn" type="button" disabled>複製到 Word</button>
+      <button id="printBtn" type="button" disabled>列印</button>
+    </div>
+
+    <div class="copytip" id="copyTip" hidden>
+      <p><strong>已複製。</strong>在 Word 貼上後，如果只看到國字，請把字型改成「ㄅ字嗨注音標楷」。</p>
+      <p>電腦要先安裝這套字型（免費）：<a href="https://github.com/ButTaiwan/bpmfvs/releases" target="_blank" rel="noopener">下載字嗨注音標楷</a>，解壓縮後在字型檔上按右鍵選「安裝」。</p>
+      <button type="button" class="linkish" id="copyTipClose">知道了</button>
+    </div>
+
+    <fieldset class="opts">
+      <legend>顯示</legend>
+      <label>注音呈現
+        <select id="renderMode">
+          <option value="font" selected>字嗨注音標楷</option>
+          <option value="css">網頁排版</option>
+        </select>
+      </label>
+      <label>字級
+        <select id="fontSize">
+          <option value="26">小</option>
+          <option value="34" selected>中</option>
+          <option value="44">大</option>
+          <option value="56">特大</option>
+        </select>
+      </label>
+      <label>破音字標示
+        <select id="markMode">
+          <option value="all" selected>全部破音字加框</option>
+          <option value="check">只標需要確認的</option>
+          <option value="none">不標示</option>
+        </select>
+      </label>
+    </fieldset>
+
+    <div class="legend" id="legend">
+      <p><span class="swatch sw-poly">行</span>黃框：破音字，已自動判斷，可以點字確認</p>
+      <p><span class="swatch sw-check">行</span>紅框：模型不太確定，建議優先檢查</p>
+      <p><span class="swatch sw-edit">行</span>綠框：你改過的讀音</p>
+      <p><span class="swatch sw-nofont">行</span>紅色波浪線：字型沒有這個讀音，會顯示預設讀音</p>
+      <p class="hint">點任何一個字，就能換成其他讀音。</p>
+    </div>
+
+    <div class="download" id="downloadBox" hidden>
+      <p><strong>第一次使用要下載破音字模型</strong>（約 <span id="dlSize">150</span> MB）。下載後會存在這台電腦的瀏覽器裡，之後打開就能直接用，也可以離線使用。</p>
+      <button id="dlBtn" class="primary" type="button">下載模型</button>
+    </div>
+  </section>
+
+  <section class="sheet-pane" aria-label="注音結果">
+    <p class="stats" id="stats" aria-live="polite"></p>
+    <article class="sheet" id="sheet" data-mark="all">
+      <p class="empty">在左邊貼上文章，按「加注音」，結果會出現在這裡。</p>
+    </article>
+  </section>
+</main>
+
+<div class="progress" id="progress" hidden role="dialog" aria-modal="true" aria-labelledby="pgTitle">
+  <div class="progress-card">
+    <h2 id="pgTitle">下載破音字模型</h2>
+    <div class="track"><div class="fill" id="pgFill"></div></div>
+    <p id="pgText">準備中…</p>
+    <p class="sub">只有第一次需要下載，之後會直接從這台電腦讀取。</p>
+  </div>
+</div>
+
+<div class="pop" id="pop" hidden role="dialog" aria-labelledby="popChar">
+  <div class="pop-head"><span class="pop-char" id="popChar"></span><span class="pop-ctx" id="popCtx"></span></div>
+  <div class="pop-list" id="popList"></div>
+  <form class="pop-custom" id="popForm">
+    <label for="popInput">自己輸入</label>
+    <input id="popInput" autocomplete="off" placeholder="例如 ㄏㄤˊ">
+    <button type="submit">套用</button>
+  </form>
+  <button class="pop-reset" id="popReset" type="button">還原自動判斷</button>
+</div>
+
+<footer class="foot">
+  <p>文字只在你的瀏覽器裡處理，不會上傳。破音字判斷使用開源模型 <a href="https://github.com/GitYCC/g2pW" target="_blank" rel="noopener">g2pW</a>（Apache 2.0），注音字型為 <a href="https://github.com/ButTaiwan/bpmfvs" target="_blank" rel="noopener">字嗨注音標楷</a>（SIL OFL 1.1）。</p>
+  <p class="foot-tools"><button type="button" id="testBtn" class="linkish">檢查模型是否正常</button><button type="button" id="clearBtn" class="linkish">刪除已下載的模型</button></p>
+</footer>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
