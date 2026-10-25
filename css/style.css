@@ -145,6 +145,7 @@ button.small { padding: 4px 12px; font-size: .85rem; flex: none; }
 
 .foot { padding: 8px 24px 32px; font-size: .85rem; color: var(--ink-soft); }
 .foot p { margin: 4px 0; }
+.foot .maker { font-weight: 600; color: var(--ink); }
 .foot a { color: inherit; }
 .foot-tools { display: flex; gap: 16px; flex-wrap: wrap; }
 .linkish { border: 0; background: none; padding: 0; text-decoration: underline; color: inherit; }
@@ -198,7 +199,17 @@ button.small { padding: 4px 12px; font-size: .85rem; flex: none; }
 .wc { height: var(--rh); flex: none; display: flex; align-items: center; font: var(--s)/1 "BpmfZihiKai", var(--han-font); }
 .wc.num { font-weight: 700; }
 .wc.plain { width: 1em; justify-content: center; font-family: var(--han-font); }
-.wc.punct { align-items: flex-start; justify-content: flex-end; padding: .05em .05em 0 0; }
+.wc.punct { justify-content: center; }
+/* 橫書：標題在上方，一列一列由上往下 */
+.wspage.h { flex-direction: column; }
+.wspage.h .wsside { width: auto; height: 12mm; flex-direction: row; justify-content: space-between; border-left: 0; border-bottom: .4mm solid #9fb8a8; padding: 0 2mm; }
+.wspage.h .wst, .wspage.h .wsn { flex-direction: row; align-items: baseline; }
+.wspage.h .wst { flex: 1; }
+.wspage.h .wst > span, .wspage.h .wsn > span { height: auto; }
+.wspage.h .wsn { padding: 0 45mm 1mm 0; }
+.wspage.h .wscols { flex-direction: column; }
+.wspage.h .wscol { width: auto; height: var(--cw); flex-direction: row; }
+.wspage.h .wc { width: var(--rh); height: var(--cw); }
 .wc.hid .box { width: var(--s); height: var(--s); flex: none; border: .35mm solid #333; box-sizing: border-box;
   background:
     linear-gradient(to right, transparent calc(50% - .1mm), #bbb calc(50% - .1mm), #bbb calc(50% + .1mm), transparent calc(50% + .1mm)),

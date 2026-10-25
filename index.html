@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>注音校對簿</title>
+<title>注音破音字校對簿</title>
 <meta name="description" content="貼上文章，自動加注音並判斷破音字。模型在你的瀏覽器裡執行，文字不會上傳。">
 <!-- 讓 GitHub Pages 也能開啟多執行緒（加快推論）；必須是第一個載入的腳本 -->
 <script src="coi-serviceworker.min.js"></script>
@@ -13,7 +13,7 @@
 </head>
 <body>
 <header class="bar">
-  <h1 class="brand">注音校對簿</h1>
+  <h1 class="brand">注音破音字校對簿</h1>
   <p class="model-chip" id="modelChip" data-state="idle">檢查模型中…</p>
 </header>
 
@@ -121,8 +121,12 @@
         <select id="wsSize"></select>
       </label>
       <fieldset class="wsdlg-orient"><legend>紙張</legend>
-        <label><input type="radio" name="wsOrient" value="landscape" checked> A4 橫式</label>
-        <label><input type="radio" name="wsOrient" value="portrait"> A4 直式</label>
+        <label><input type="radio" name="wsOrient" value="landscape" checked> 橫式</label>
+        <label><input type="radio" name="wsOrient" value="portrait"> 直式</label>
+      </fieldset>
+      <fieldset class="wsdlg-orient"><legend>文字</legend>
+        <label><input type="radio" name="wsDir" value="v" checked> 直書</label>
+        <label><input type="radio" name="wsDir" value="h"> 橫書</label>
       </fieldset>
     </div>
     <div class="wsdlg-table">
@@ -145,7 +149,10 @@
   <div class="wsbar">
     <button type="button" id="wsBack">修改內容</button>
     <label>紙張
-      <select id="wsOrientView"><option value="landscape">A4 橫式</option><option value="portrait">A4 直式</option></select>
+      <select id="wsOrientView"><option value="landscape">橫式</option><option value="portrait">直式</option></select>
+    </label>
+    <label>文字
+      <select id="wsDirView"><option value="v">直書</option><option value="h">橫書</option></select>
     </label>
     <label>字級（點）
       <select id="wsSizeView"></select>
@@ -173,6 +180,7 @@
 </div>
 
 <footer class="foot">
+  <p class="maker">本程式由苗栗公館國小資源班製作</p>
   <p>文字只在你的瀏覽器裡處理，不會上傳。破音字判斷使用開源模型 <a href="https://github.com/GitYCC/g2pW" target="_blank" rel="noopener">g2pW</a>（Apache 2.0），注音字型為 <a href="https://github.com/ButTaiwan/bpmfvs" target="_blank" rel="noopener">字嗨注音標楷</a>（SIL OFL 1.1）。</p>
   <p class="foot-tools"><button type="button" id="testBtn" class="linkish">檢查模型是否正常</button><button type="button" id="clearBtn" class="linkish">刪除已下載的模型</button></p>
 </footer>

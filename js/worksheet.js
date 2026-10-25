@@ -53,6 +53,7 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
       title: $('wsTitle').value.trim(),
       size: $('wsSize').value,
       orient: document.querySelector('input[name="wsOrient"]:checked')?.value || 'landscape',
+      dir: document.querySelector('input[name="wsDir"]:checked')?.value || 'v',
       lessons: NUMS.map((_, i) => ({ text: $(`wsText${i}`).value, chars: $(`wsChars${i}`).value })),
     };
   }
@@ -62,6 +63,8 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
     if (d.size) $('wsSize').value = String(sizePt(d.size));
     const o = document.querySelector(`input[name="wsOrient"][value="${d.orient}"]`);
     if (o) o.checked = true;
+    const dr = document.querySelector(`input[name="wsDir"][value="${d.dir || 'v'}"]`);
+    if (dr) dr.checked = true;
     (d.lessons || []).forEach((l, i) => { if ($(`wsText${i}`)) { $(`wsText${i}`).value = l.text || ''; $(`wsChars${i}`).value = l.chars || ''; } });
   }
   const saveForm = () => { try { localStorage.setItem(STORE, JSON.stringify(readForm())); } catch { /* ignore */ } };
@@ -152,6 +155,7 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
       ws.data = d;
       $('wsDialog').hidden = true;
       $('wsOrientView').value = d.orient;
+      $('wsDirView').value = d.dir || 'v';
       $('wsSizeView').value = String(sizePt(d.size));
       openView();
       const notFound = lessons.flatMap((l) => [...l.chars].filter((c) => !l.text.includes(c)).map((c) => `第${l.num}課「${c}」`));
@@ -173,27 +177,46 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
     return Math.max(0, list.indexOf(splitPron(p).text));
   }
 
+  // dir: 'v' 直書（由右往左一行一行）、'h' 橫書（由上往下一列一列）
+  const OPENERS = /^[（(「『《〈【［\[｛{〔“‘]$/u;
   function layout() {
     const [pw, ph] = PAGE[ws.data.orient];
     const s = sizePt(ws.data.size) * PT;
-    const rowH = s * 1.22, colW = s * 1.72;
-    const nRows = Math.max(4, Math.floor((ph - 2 * MARGIN) / rowH));
-    const nCols = Math.max(2, Math.floor((pw - 2 * MARGIN - SIDEBAR - 3) / colW));
+    const v = ws.data.dir !== 'h';
+    // 直書：cellH = 每格高、lineW = 每行寬；橫書：cellH = 每格寬、lineW = 每列高
+    const cellH = v ? s * 1.22 : s * 1.62;
+    const lineW = v ? s * 1.72 : s * 1.5;
+    const along = v ? ph - 2 * MARGIN : pw - 2 * MARGIN - cellH;     // 橫書留一格給行尾標點
+    const across = (v ? pw : ph) - 2 * MARGIN - SIDEBAR - 3;
+    const nRows = Math.max(4, Math.floor(along / cellH));
+    const nCols = Math.max(2, Math.floor(across / lineW));
     const pages = [];
     let cols = [], col = [];
     const pushCol = () => { if (col.length) cols.push(col); col = []; if (cols.length === nCols) { pages.push(cols); cols = []; } };
     ws.tokens.forEach((t, i) => {
       if (t.kind === 'num') { pushCol(); }
       if (col.length >= nRows) {
-        if (t.kind === 'char' && isPunct(t.c) && col.length === nRows) { col.push(i); return; } // 標點不放行首
+        if (t.kind === 'char' && isPunct(t.c) && !OPENERS.test(t.c) && col.length === nRows) { col.push(i); return; } // 標點不放行首
         pushCol();
+      } else if (t.kind === 'char' && OPENERS.test(t.c) && col.length === nRows - 1) {
+        pushCol();                                                                      // 前括號不放行尾
       }
       col.push(i);
     });
     pushCol();
     if (cols.length) pages.push(cols);
-    return { pages, pw, ph, s, rowH, colW, nRows };
+    return { pages, pw, ph, s, rowH: cellH, colW: lineW, nRows, v };
   }
+
+  // 直書時把標點換成直排用的字形（括號、引號、破折號、刪節號…）
+  const VERT = {
+    '（': '︵', '）': '︶', '(': '︵', ')': '︶', '「': '﹁', '」': '﹂', '『': '﹃', '』': '﹄',
+    '《': '︽', '》': '︾', '〈': '︿', '〉': '﹀', '【': '︻', '】': '︼', '［': '﹇', '］': '﹈', '[': '﹇', ']': '﹈',
+    '｛': '︷', '｝': '︸', '{': '︷', '}': '︸', '〔': '︹', '〕': '︺', '“': '﹁', '”': '﹂', '‘': '﹃', '’': '﹄',
+    '—': '︱', '－': '︱', '-': '︱', '…': '︙', '⋯': '︙', '～': '≀', '~': '≀', '：': '︰', ':': '︰', '；': '︔', ';': '︔',
+    '_': '︳', '＿': '︳',
+  };
+  const punctFor = (c) => (ws.data.dir !== 'h' && VERT[c]) || c;
 
   // mode: 'zy2hz' 看注音寫國字、'hz2zy' 看國字寫注音、'ans' 答案卷
   function cellHTML(t, i, mode) {
@@ -206,7 +229,7 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
     if (t.hide && mode === 'hz2zy') {
       return `<div class="wc zq${red}${pick}" data-i="${i}"><span class="hz">${esc(t.c)}\u{E01E0}</span><span class="zbox"></span></div>`;
     }
-    if (!t.p) return `<div class="wc plain${isPunct(t.c) ? ' punct' : ''}">${esc(t.c)}</div>`;
+    if (!t.p) return `<div class="wc plain${isPunct(t.c) ? ' punct' : ''}">${esc(isPunct(t.c) ? punctFor(t.c) : t.c)}</div>`;
     const ans = t.hide && mode === 'ans' ? ' ans' : '';
     return `<div class="wc ch${ans}${red}${pick}" data-i="${i}">${esc(t.c)}${vs(idxOf(t.c, t.p))}</div>`;
   }
@@ -218,7 +241,7 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
     const base = ws.data.title || '';
     const title = base ? `${base}　${MODES[mode]}` : MODES[mode];
     return L.pages.map((cols, pi) => `
-      <section class="wspage" data-mode="${mode}" style="width:${L.pw}mm;height:${L.ph}mm;--s:${L.s}mm;--rh:${L.rowH}mm;--cw:${L.colW}mm">
+      <section class="wspage ${L.v ? 'v' : 'h'}" data-mode="${mode}" style="width:${L.pw}mm;height:${L.ph}mm;--s:${L.s}mm;--rh:${L.rowH}mm;--cw:${L.colW}mm">
         <aside class="wsside"><span class="wst">${vText(title)}</span>${mode === 'ans' ? '' : `<span class="wsn">${vText('姓名')}</span>`}${L.pages.length > 1 ? `<span class="wsp">${pi + 1}/${L.pages.length}</span>` : ''}</aside>
         <div class="wscols">${cols.map((c) => `<div class="wscol">${c.map((i) => cellHTML(ws.tokens[i], i, mode)).join('')}</div>`).join('')}</div>
       </section>`).join('');
@@ -260,6 +283,7 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
     setTimeout(() => { window.print(); render(); }, 50);
   });
 
+  $('wsDirView').addEventListener('change', () => { ws.data.dir = $('wsDirView').value; closeMenu(); render(); });
   $('wsOrientView').addEventListener('change', () => { ws.data.orient = $('wsOrientView').value; render(); });
   $('wsSizeView').addEventListener('change', () => { ws.data.size = $('wsSizeView').value; render(); });
   $('wsView').addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (!$('wsPrintDlg').hidden) $('wsPrintDlg').hidden = true; else if (!$('wsMenu').hidden) closeMenu(); else closeView(); } });
