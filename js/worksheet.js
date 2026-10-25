@@ -15,7 +15,6 @@ const MARGIN = 10, SIDEBAR = 16;                       // mm
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const vs = (i) => (i > 0 ? String.fromCodePoint(0xE01E0 + i) : '');
-const vText = (t) => Array.from(t).map((c) => `<span>${c === ' ' ? '&nbsp;' : esc(c)}</span>`).join('');
 const isPunct = (c) => /^[\p{P}\p{S}]$/u.test(c);
 
 // 注音直排：符號一欄，聲調放在右邊、對齊整串符號的正中間
@@ -189,12 +188,18 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
     const along = v ? ph - 2 * MARGIN : pw - 2 * MARGIN - cellH;     // 橫書留一格給行尾標點
     const across = (v ? pw : ph) - 2 * MARGIN - SIDEBAR - 3;
     const nRows = Math.max(4, Math.floor(along / cellH));
-    const nCols = Math.max(2, Math.floor(across / lineW));
+    const gap = lineW * 0.6;                                          // 每一課之間空一點
     const pages = [];
-    let cols = [], col = [];
-    const pushCol = () => { if (col.length) cols.push(col); col = []; if (cols.length === nCols) { pages.push(cols); cols = []; } };
+    let cols = [], col = [], used = 0;
+    const pushCol = () => {
+      if (!col.length) return;
+      let need = lineW + (col.ls && cols.length ? gap : 0);
+      if (cols.length && used + need > across + 0.01) { pages.push(cols); cols = []; used = 0; need = lineW; }
+      cols.push(col); used += need;
+      col = [];
+    };
     ws.tokens.forEach((t, i) => {
-      if (t.kind === 'num') { pushCol(); }
+      if (t.kind === 'num') { pushCol(); col.ls = true; }
       if (col.length >= nRows) {
         if (t.kind === 'char' && isPunct(t.c) && !OPENERS.test(t.c) && col.length === nRows) { col.push(i); return; } // 標點不放行首
         pushCol();
@@ -205,7 +210,7 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
     });
     pushCol();
     if (cols.length) pages.push(cols);
-    return { pages, pw, ph, s, rowH: cellH, colW: lineW, nRows, v };
+    return { pages, pw, ph, s, rowH: cellH, colW: lineW, nRows, v, gap };
   }
 
   // 直書時把標點換成直排用的字形（括號、引號、破折號、刪節號…）
@@ -213,10 +218,13 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
     '（': '︵', '）': '︶', '(': '︵', ')': '︶', '「': '﹁', '」': '﹂', '『': '﹃', '』': '﹄',
     '《': '︽', '》': '︾', '〈': '︿', '〉': '﹀', '【': '︻', '】': '︼', '［': '﹇', '］': '﹈', '[': '﹇', ']': '﹈',
     '｛': '︷', '｝': '︸', '{': '︷', '}': '︸', '〔': '︹', '〕': '︺', '“': '﹁', '”': '﹂', '‘': '﹃', '’': '﹄',
-    '—': '︱', '－': '︱', '-': '︱', '…': '︙', '⋯': '︙', '～': '≀', '~': '≀', '：': '︰', ':': '︰', '；': '︔', ';': '︔',
+    '—': '︱', '－': '︱', '-': '︱', '…': '︙', '⋯': '︙', '：': '︰', ':': '︰', '；': '︔', ';': '︔',
     '_': '︳', '＿': '︳',
   };
-  const punctFor = (c) => (ws.data.dir !== 'h' && VERT[c]) || c;
+  const ROTATE = /^[～~〜]$/u;                                      // 沒有直排字形的，轉 90 度
+  const vChar = (c) => (ROTATE.test(c) ? `<span class="rot">${esc(c)}</span>` : esc(VERT[c] || c));
+  const punctHTML = (c) => (ws.data.dir !== 'h' ? vChar(c) : esc(c));
+  const sideText = (t, v) => Array.from(t).map((c) => `<span>${c === ' ' ? '&nbsp;' : v ? vChar(c) : esc(c)}</span>`).join('');
 
   // mode: 'zy2hz' 看注音寫國字、'hz2zy' 看國字寫注音、'ans' 答案卷
   function cellHTML(t, i, mode) {
@@ -229,7 +237,7 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
     if (t.hide && mode === 'hz2zy') {
       return `<div class="wc zq${red}${pick}" data-i="${i}"><span class="hz">${esc(t.c)}\u{E01E0}</span><span class="zbox"></span></div>`;
     }
-    if (!t.p) return `<div class="wc plain${isPunct(t.c) ? ' punct' : ''}">${esc(isPunct(t.c) ? punctFor(t.c) : t.c)}</div>`;
+    if (!t.p) return `<div class="wc plain${isPunct(t.c) ? ' punct' : ''}">${isPunct(t.c) ? punctHTML(t.c) : esc(t.c)}</div>`;
     const ans = t.hide && mode === 'ans' ? ' ans' : '';
     return `<div class="wc ch${ans}${red}${pick}" data-i="${i}">${esc(t.c)}${vs(idxOf(t.c, t.p))}</div>`;
   }
@@ -241,9 +249,9 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
     const base = ws.data.title || '';
     const title = base ? `${base}　${MODES[mode]}` : MODES[mode];
     return L.pages.map((cols, pi) => `
-      <section class="wspage ${L.v ? 'v' : 'h'}" data-mode="${mode}" style="width:${L.pw}mm;height:${L.ph}mm;--s:${L.s}mm;--rh:${L.rowH}mm;--cw:${L.colW}mm">
-        <aside class="wsside"><span class="wst">${vText(title)}</span>${mode === 'ans' ? '' : `<span class="wsn">${vText('姓名')}</span>`}${L.pages.length > 1 ? `<span class="wsp">${pi + 1}/${L.pages.length}</span>` : ''}</aside>
-        <div class="wscols">${cols.map((c) => `<div class="wscol">${c.map((i) => cellHTML(ws.tokens[i], i, mode)).join('')}</div>`).join('')}</div>
+      <section class="wspage ${L.v ? 'v' : 'h'}" data-mode="${mode}" style="width:${L.pw}mm;height:${L.ph}mm;--s:${L.s}mm;--rh:${L.rowH}mm;--cw:${L.colW}mm;--gap:${L.gap}mm">
+        <aside class="wsside"><span class="wst">${sideText(title, L.v)}</span>${mode === 'ans' ? '' : `<span class="wsn">${sideText('姓名', L.v)}</span>`}${L.pages.length > 1 ? `<span class="wsp">${pi + 1}/${L.pages.length}</span>` : ''}</aside>
+        <div class="wscols">${cols.map((c, ci) => `<div class="wscol${c.ls && ci ? ' ls' : ''}">${c.map((i) => cellHTML(ws.tokens[i], i, mode)).join('')}</div>`).join('')}</div>
       </section>`).join('');
   }
 

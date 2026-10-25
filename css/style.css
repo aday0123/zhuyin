@@ -201,6 +201,9 @@ button.small { padding: 4px 12px; font-size: .85rem; flex: none; }
 .wc.plain { width: 1em; justify-content: center; font-family: var(--han-font); }
 .wc.punct { justify-content: center; }
 /* 橫書：標題在上方，一列一列由上往下 */
+.wspage.v .wscol.ls { margin-right: var(--gap); }
+.wspage.h .wscol.ls { margin-top: var(--gap); }
+.wspage .rot { display: inline-block; transform: rotate(90deg); }
 .wspage.h { flex-direction: column; }
 .wspage.h .wsside { width: auto; height: 12mm; flex-direction: row; justify-content: space-between; border-left: 0; border-bottom: .4mm solid #9fb8a8; padding: 0 2mm; }
 .wspage.h .wst, .wspage.h .wsn { flex-direction: row; align-items: baseline; }
