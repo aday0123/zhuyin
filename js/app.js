@@ -170,7 +170,8 @@ function countText() {
   return `破音字 ${poly} 個（黃框），點字可以改讀音；其中 ${check} 個模型較不確定（紅框），建議優先檢查。` + (nofont ? `有 ${nofont} 個字的讀音字型無法顯示（紅色波浪線）。` : '');
 }
 const keyOf = (li, ci, c) => `${li}:${ci}:${c}`;
-const isPoly = (r) => r.src === 'model' && r.cands && r.cands.length > 1;
+// 字型模式下，只有字型裡真的能切換讀音的字才算破音字（例如「學」字型只有一個讀音）
+const isPoly = (r) => r.src === 'model' && r.cands && r.cands.length > 1 && (state.mode !== 'font' || (fontData.readings[r.c]?.length || 0) > 1);
 const needsCheck = (r, li, ci) => isPoly(r) && r.conf < CHECK_BELOW && !(keyOf(li, ci, r.c) in state.overrides);
 
 function esc(s) { return s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
