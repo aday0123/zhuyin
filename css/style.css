@@ -186,6 +186,7 @@ button.small { padding: 4px 12px; font-size: .85rem; flex: none; }
 .wsbar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: #fff; border-bottom: 1px solid var(--rule); flex-wrap: wrap; }
 .wsbar label { display: flex; align-items: center; gap: 6px; }
 .wsnote { flex: 1; margin: 0; font-size: .85rem; color: var(--ink-soft); min-width: 200px; }
+.wsnote.warn { color: var(--pen); font-weight: 600; }
 .wsbar .x { border: 0; font-size: 1.1rem; }
 .wspages { flex: 1; overflow: auto; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 20px; }
 .wspage { flex: none; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.15); display: flex; flex-direction: row-reverse; padding: 10mm; gap: 3mm; overflow: hidden; color: #111; }
@@ -203,6 +204,8 @@ button.small { padding: 4px 12px; font-size: .85rem; flex: none; }
 /* 橫書：標題在上方，一列一列由上往下 */
 .wspage.v .wscol.ls { margin-right: var(--gap); }
 .wspage.h .wscol.ls { margin-top: var(--gap); }
+.wspage.v .wscol.ps { margin-right: var(--pgap); }
+.wspage.h .wscol.ps { margin-top: var(--pgap); }
 .wspage .rot { display: inline-block; transform: rotate(90deg); }
 .wspage.h { flex-direction: column; }
 .wspage.h .wsside { width: auto; height: 12mm; flex-direction: row; justify-content: space-between; border-left: 0; border-bottom: .4mm solid #9fb8a8; padding: 0 2mm; }

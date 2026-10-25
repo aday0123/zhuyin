@@ -120,18 +120,18 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
 
   $('wsDialog').addEventListener('keydown', (e) => { if (e.key === 'Escape') $('wsDialog').hidden = true; });
 
-  // 每一課的文字：換行當作分隔，沒有標點的行尾補「。」
-  function lessonText(t) {
-    return t.replace(/\r\n?/g, '\n').replace(IVS_ALL, '').split('\n')
-      .map((l) => l.trim()).filter(Boolean)
-      .map((l) => (isPunct(Array.from(l).pop()) ? l : l + '。')).join('');
+  // 每一課的文字：照原文分行；空白行當作段落
+  function lessonLines(t) {
+    return t.replace(/\r\n?/g, '\n').replace(IVS_ALL, '').split('\n').map((l) => l.replace(/\s+$/u, ''));
   }
 
   $('wsMake').addEventListener('click', async () => {
     const d = readForm();
     saveForm();
-    const lessons = d.lessons.map((l, i) => ({ num: NUMS[i], text: lessonText(l.text), chars: new Set(Array.from(l.chars).filter((c) => HAN.test(c))) }))
-      .filter((l) => l.text);
+    const lessons = d.lessons.map((l, i) => {
+      const lines = lessonLines(l.text);
+      return { num: NUMS[i], lines, text: lines.join(''), chars: new Set(Array.from(l.chars).filter((c) => HAN.test(c))) };
+    }).filter((l) => l.text.trim());
     if (!lessons.length) { $('wsMsg').textContent = '請至少輸入一課的課文或語詞。'; return; }
     const missing = lessons.filter((l) => !l.chars.size).map((l) => `第${l.num}課`);
     $('wsMake').disabled = true;
@@ -140,14 +140,23 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
       if (!(await ensureModel())) { $('wsMsg').textContent = '模型還沒準備好，請先下載模型。'; return; }
       await loadFontData();
       await waitFont();
-      const res = await call('convert', { lines: lessons.map((l) => l.text) });
+      // 每一行分開送去判斷讀音，再照原文的換行、空行排版
+      const flat = lessons.flatMap((l) => l.lines.filter((x) => x.trim()));
+      const res = await call('convert', { lines: flat });
       ws.tokens = [];
-      lessons.forEach((l, li) => {
+      let li = 0;
+      lessons.forEach((l) => {
         Array.from(l.num).forEach((c, k) => ws.tokens.push({ kind: k ? 'num2' : 'num', c, p: null }));
-        res.lines[li].forEach((r) => {
-          ws.tokens.push({
-            kind: 'char', c: r.c, p: r.p, conf: r.src === 'model' && r.cands?.length > 1 ? r.conf : 1,
-            hide: l.chars.has(r.c) && !!r.p,
+        let started = false, blank = false;
+        l.lines.forEach((line) => {
+          if (!line.trim()) { blank = true; return; }
+          if (started) ws.tokens.push({ kind: blank ? 'para' : 'br' });
+          started = true; blank = false;
+          res.lines[li++].forEach((r) => {
+            ws.tokens.push({
+              kind: 'char', c: r.c, p: r.p, conf: r.src === 'model' && r.cands?.length > 1 ? r.conf : 1,
+              hide: l.chars.has(r.c) && !!r.p,
+            });
           });
         });
       });
@@ -160,8 +169,9 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
       const notFound = lessons.flatMap((l) => [...l.chars].filter((c) => !l.text.includes(c)).map((c) => `第${l.num}課「${c}」`));
       let msg = '請先檢查讀音（紅字是生字）。點字可以換讀音，有紅框的字建議優先確認。改好後按右邊的按鈕輸出作業單。';
       if (missing.length) msg = `${missing.join('、')} 沒有填生字，這幾課不會挖空。` + msg;
-      if (notFound.length) msg = `這些生字在課文裡找不到：${notFound.slice(0, 6).join('、')}${notFound.length > 6 ? '…' : ''}。` + msg;
+      if (notFound.length) msg = `注意：有 ${notFound.length} 個生字在課文裡找不到，不會挖空，請確認生字和課文是不是同一課：${notFound.slice(0, 12).join('、')}${notFound.length > 12 ? '…' : ''}。` + msg;
       $('wsNote').textContent = msg;
+      $('wsNote').classList.toggle('warn', notFound.length > 0);
     } catch (e) {
       $('wsMsg').textContent = '產生失敗：' + e.message;
     } finally {
@@ -189,17 +199,20 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
     const across = (v ? pw : ph) - 2 * MARGIN - SIDEBAR - 3;
     const nRows = Math.max(4, Math.floor(along / cellH));
     const gap = lineW * 0.6;                                          // 每一課之間空一點
+    const pgap = lineW * 0.3;                                         // 段落之間空一點
     const pages = [];
     let cols = [], col = [], used = 0;
     const pushCol = () => {
       if (!col.length) return;
-      let need = lineW + (col.ls && cols.length ? gap : 0);
+      let need = lineW + (cols.length ? (col.ls ? gap : col.ps ? pgap : 0) : 0);
       if (cols.length && used + need > across + 0.01) { pages.push(cols); cols = []; used = 0; need = lineW; }
       cols.push(col); used += need;
       col = [];
     };
     ws.tokens.forEach((t, i) => {
       if (t.kind === 'num') { pushCol(); col.ls = true; }
+      if (t.kind === 'br') { pushCol(); return; }                        // 原文換行
+      if (t.kind === 'para') { pushCol(); col.ps = true; return; }       // 原文空行＝段落
       if (col.length >= nRows) {
         if (t.kind === 'char' && isPunct(t.c) && !OPENERS.test(t.c) && col.length === nRows) { col.push(i); return; } // 標點不放行首
         pushCol();
@@ -210,7 +223,7 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
     });
     pushCol();
     if (cols.length) pages.push(cols);
-    return { pages, pw, ph, s, rowH: cellH, colW: lineW, nRows, v, gap };
+    return { pages, pw, ph, s, rowH: cellH, colW: lineW, nRows, v, gap, pgap };
   }
 
   // 直書時把標點換成直排用的字形（括號、引號、破折號、刪節號…）
@@ -249,9 +262,9 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
     const base = ws.data.title || '';
     const title = base ? `${base}　${MODES[mode]}` : MODES[mode];
     return L.pages.map((cols, pi) => `
-      <section class="wspage ${L.v ? 'v' : 'h'}" data-mode="${mode}" style="width:${L.pw}mm;height:${L.ph}mm;--s:${L.s}mm;--rh:${L.rowH}mm;--cw:${L.colW}mm;--gap:${L.gap}mm">
+      <section class="wspage ${L.v ? 'v' : 'h'}" data-mode="${mode}" style="width:${L.pw}mm;height:${L.ph}mm;--s:${L.s}mm;--rh:${L.rowH}mm;--cw:${L.colW}mm;--gap:${L.gap}mm;--pgap:${L.pgap}mm">
         <aside class="wsside"><span class="wst">${sideText(title, L.v)}</span>${mode === 'ans' ? '' : `<span class="wsn">${sideText('姓名', L.v)}</span>`}${L.pages.length > 1 ? `<span class="wsp">${pi + 1}/${L.pages.length}</span>` : ''}</aside>
-        <div class="wscols">${cols.map((c, ci) => `<div class="wscol${c.ls && ci ? ' ls' : ''}">${c.map((i) => cellHTML(ws.tokens[i], i, mode)).join('')}</div>`).join('')}</div>
+        <div class="wscols">${cols.map((c, ci) => `<div class="wscol${ci && c.ls ? ' ls' : ci && c.ps ? ' ps' : ''}">${c.map((i) => cellHTML(ws.tokens[i], i, mode)).join('')}</div>`).join('')}</div>
       </section>`).join('');
   }
 
