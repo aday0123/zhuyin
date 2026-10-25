@@ -42,10 +42,10 @@
       </label>
       <label>字級
         <select id="fontSize">
-          <option value="26">小</option>
-          <option value="34" selected>中</option>
-          <option value="44">大</option>
-          <option value="56">特大</option>
+          <option value="20">小</option>
+          <option value="26" selected>中</option>
+          <option value="34">大</option>
+          <option value="44">特大</option>
         </select>
       </label>
       <label>破音字標示
@@ -58,6 +58,7 @@
     </fieldset>
 
     <div class="legend" id="legend">
+      <p><span class="swatch sw-pend">行</span>灰色虛線：還在判斷讀音</p>
       <p><span class="swatch sw-poly">行</span>黃框：破音字，已自動判斷，可以點字確認</p>
       <p><span class="swatch sw-check">行</span>紅框：模型不太確定，建議優先檢查</p>
       <p><span class="swatch sw-edit">行</span>綠框：你改過的讀音</p>
@@ -72,10 +73,18 @@
   </section>
 
   <section class="sheet-pane" aria-label="注音結果">
-    <p class="stats" id="stats" aria-live="polite"></p>
+    <div class="sheet-head">
+      <p class="stats" id="stats" aria-live="polite"></p>
+      <button type="button" id="editBtn" class="small" disabled>修改文字</button>
+    </div>
+    <div class="jobbar" id="jobbar" hidden><div class="jobfill" id="jobfill"></div></div>
     <article class="sheet" id="sheet" data-mark="all">
       <p class="empty">在左邊貼上文章，按「加注音」，結果會出現在這裡。</p>
     </article>
+    <div class="editwrap" id="editwrap" hidden>
+      <div class="mirror" id="mirror" aria-hidden="true"></div>
+      <textarea class="editor" id="editor" spellcheck="false" aria-label="修改文字"></textarea>
+    </div>
   </section>
 </main>
 

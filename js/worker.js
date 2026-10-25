@@ -42,7 +42,10 @@ self.onmessage = async (ev) => {
     } else if (type === 'convert') {
       const e = await ensureEngine();
       const t0 = performance.now();
-      const lines = await e.convert(ev.data.lines, p => post('convertProgress', { id, ...p }));
+      const lines = await e.convert(ev.data.lines, null, {
+        onPlan: (p) => post('plan', { id, ...p }),
+        onPartial: (p) => post('partial', { id, ...p }),
+      });
       post('converted', { id, lines, ms: Math.round(performance.now() - t0) });
     } else if (type === 'readings') {
       const e = await ensureEngine();

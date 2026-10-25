@@ -60,7 +60,27 @@ select { border: 1px solid var(--rule); border-radius: 6px; padding: 4px 8px; ba
 
 /* ---- 作業紙 ---- */
 .sheet-pane { min-width: 0; }
-.stats { margin: 0 0 8px; min-height: 1.6em; font-size: .9rem; color: var(--ink-soft); }
+.stats { margin: 0; min-height: 1.6em; font-size: .9rem; color: var(--ink-soft); flex: 1; }
+.sheet-head { display: flex; align-items: center; gap: 12px; margin: 0 0 8px; }
+button.small { padding: 4px 12px; font-size: .85rem; flex: none; }
+.jobbar { height: 6px; background: #dfe8e1; border-radius: 999px; overflow: hidden; margin: 0 0 8px; }
+.jobfill { height: 100%; width: 0; background: var(--ink); transition: width .2s linear; }
+.pend, .fc.pend, .cell.pend { color: #8a9a90; outline: 1.5px dashed #a9b8ae; outline-offset: -2px; border-radius: 4px; }
+.sw-pend { color: #8a9a90; outline: 1.5px dashed #a9b8ae; outline-offset: -2px; }
+
+/* 修改文字：透明文字框疊在有注音與框的畫面上 */
+.editwrap { position: relative; height: max(60vh, 420px); }
+.mirror, .editor { position: absolute; inset: 0; margin: 0; padding: 40px 48px; border-radius: 4px;
+  font: var(--fs)/1.45 "BpmfZihiKai", var(--han-font); letter-spacing: 0; tab-size: 4;
+  white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-all; overflow-y: scroll; overflow-x: hidden; border: 1px solid var(--rule); }
+.mirror { color: var(--ink); background: #fffef6; pointer-events: none; }
+.editor { background: transparent; color: transparent; caret-color: var(--ink); resize: none; outline: none; }
+.editor::selection { background: rgba(43,108,176,.25); color: transparent; }
+.editor:focus { border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus); }
+.mirror .poly { background: var(--poly-bg); box-shadow: inset 0 0 0 1.5px var(--poly-line); border-radius: 4px; }
+.mirror .check { background: var(--poly-bg); box-shadow: inset 0 0 0 2px var(--pen); border-radius: 4px; }
+.mirror .edited { background: var(--edit-bg); box-shadow: inset 0 0 0 1.5px var(--edit); color: var(--edit); border-radius: 4px; }
+.mirror .pending { color: #8a9a90; outline: 1.5px dashed #a9b8ae; outline-offset: -2px; border-radius: 4px; }
 .sheet { background: var(--paper); border-radius: 4px; box-shadow: 0 1px 0 var(--rule), 0 0 0 1px var(--rule); padding: 40px 48px; min-height: 60vh; font-size: var(--fs); }
 .sheet .empty { font: 16px/1.6 var(--ui-font); color: var(--ink-soft); }
 .ln { margin: 0 0 .25em; line-height: 1; min-height: 1.75em; display: flex; flex-wrap: wrap; align-items: center; row-gap: .25em; }
@@ -133,7 +153,7 @@ select { border: 1px solid var(--rule); border-radius: 6px; padding: 4px 8px; ba
   .layout { grid-template-columns: 1fr; padding: 0 16px 16px; }
   .bar, .foot { padding-left: 16px; padding-right: 16px; }
   .input-pane { position: static; }
-  .sheet { padding: 24px 18px; }
+  .sheet, .mirror, .editor { padding: 24px 18px; }
   textarea { min-height: 180px; }
 }
 @media (prefers-reduced-motion: reduce) { .fill { transition: none; } }
@@ -142,7 +162,7 @@ select { border: 1px solid var(--rule); border-radius: 6px; padding: 4px 8px; ba
 @media print {
   @page { size: A4; margin: 15mm; }
   body { background: #fff; }
-  .bar, .input-pane, .stats, .foot, .pop, .progress { display: none !important; }
+  .bar, .input-pane, .sheet-head, .jobbar, .editwrap, .foot, .pop, .progress { display: none !important; }
   .layout { display: block; padding: 0; }
   .sheet { box-shadow: none; padding: 0; min-height: 0; }
   .cell { background: none !important; box-shadow: none !important; }

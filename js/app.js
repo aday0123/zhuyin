@@ -35,6 +35,7 @@ function fontIndex(c, p) {
 }
 const vsFor = (idx) => (idx > 0 ? String.fromCodePoint(0xE01E0 + idx) : '');
 const HAN_RE = /^[\p{Script=Han}]$/u;
+const IVS_ALL = /[\u{E0100}-\u{E01EF}]/gu;
 
 // ---------- 背景模型 ----------
 if (location.protocol === 'file:') {
@@ -45,8 +46,9 @@ if (location.protocol === 'file:') {
 const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
 let seq = 0;
 const pending = new Map();
-function call(type, data = {}) {
+function call(type, data = {}, onId) {
   const id = ++seq;
+  onId?.(id);
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve, reject });
     worker.postMessage({ type, id, ...data });
@@ -55,7 +57,8 @@ function call(type, data = {}) {
 worker.onmessage = (ev) => {
   const m = ev.data;
   if (m.type === 'progress') return onDownloadProgress(m);
-  if (m.type === 'convertProgress') return setStats(`判斷破音字中… ${m.done} / ${m.total}`);
+  if (m.type === 'plan') { if (m.id === state.job?.id) onPlan(m); return; }
+  if (m.type === 'partial') { if (m.id === state.job?.id) onPartial(m); return; }
   if (m.type === 'ready') { state.ready = true; setChip('ready', '模型已就緒'); $('downloadBox').hidden = true; return; }
   const p = pending.get(m.id);
   if (!p) return;
@@ -127,33 +130,76 @@ async function init() {
 
 // ---------- 加注音 ----------
 async function run() {
-  const text = $('src').value.replace(/\r\n?/g, '\n');
+  if (state.editing) endEdit(false);
+  const text = $('src').value.replace(/\r\n?/g, '\n').replace(IVS_ALL, '');
   save();
   if (!text.trim()) { setStats('請先貼上文章。'); return; }
   $('runBtn').disabled = true;
+  for (const b of ['printBtn', 'copyBtn', 'editBtn']) $(b).disabled = true;
   try {
     if (!(await ensureModel())) return;
+    if (state.mode === 'font') await waitFont();
     setStats('判斷破音字中…');
     const srcLines = text.split('\n');
-    const res = await call('convert', { lines: srcLines });
     // 文字改過的位置，舊的手動讀音就不再套用
     for (const k of Object.keys(state.overrides)) {
       const [li, ci, ch] = k.split(':');
       if (Array.from(srcLines[+li] ?? '')[+ci] !== ch) delete state.overrides[k];
     }
     state.srcLines = srcLines;
+    state.complete = false;
+    const res = await call('convert', { lines: srcLines }, (id) => { state.job = { id, t0: 0, d0: 0 }; });
+    state.job = null;
     state.lines = res.lines;
-    if (state.mode === 'font') await waitFont();
+    state.complete = true;
+    $('jobbar').hidden = true;
     render();
     save();
-    $('printBtn').disabled = false;
-    $('copyBtn').disabled = false;
+    for (const b of ['printBtn', 'copyBtn', 'editBtn']) $(b).disabled = false;
     setStats(`完成，花了 ${(res.ms / 1000).toFixed(1)} 秒。` + countText());
   } catch (e) {
+    state.job = null;
+    $('jobbar').hidden = true;
     setStats('處理失敗：' + e.message);
   } finally {
     $('runBtn').disabled = false;
   }
+}
+
+// 判斷進度：先顯示全文與總數，再一批一批換成正確讀音
+function jobText() {
+  const j = state.job;
+  let t = `共 ${j.total} 個字需要判斷讀音，已完成 ${j.done} 個`;
+  if (j.t0 && j.done > j.d0 && j.done < j.total) {
+    const left = Math.ceil((j.total - j.done) / ((j.done - j.d0) / (performance.now() - j.t0)) / 1000);
+    if (left >= 2) t += `，大約還要 ${left} 秒`;
+  }
+  return t + '…';
+}
+function onPlan(m) {
+  state.lines = m.lines;
+  Object.assign(state.job, { total: m.total, done: 0 });
+  render();
+  if (m.total) {
+    $('jobbar').hidden = false;
+    $('jobfill').style.width = '0%';
+    setStats(jobText());
+  }
+}
+function onPartial(m) {
+  const j = state.job;
+  if (!j || !state.lines) return;
+  if (!j.t0) { j.t0 = performance.now(); j.d0 = m.done; }
+  for (const [li, ci, d] of m.results) {
+    const r = state.lines[li]?.[ci];
+    if (!r) continue;
+    Object.assign(r, d);
+    const el = $('sheet').querySelector(`[data-k="${CSS.escape(keyOf(li, ci, r.c))}"]`);
+    if (el) el.outerHTML = cellHTML(r, li, ci);
+  }
+  j.done = m.done;
+  $('jobfill').style.width = `${(100 * m.done / Math.max(m.total, 1)).toFixed(1)}%`;
+  setStats(jobText());
 }
 
 function counts() {
@@ -170,7 +216,8 @@ function countText() {
   return `破音字 ${poly} 個（黃框），點字可以改讀音；其中 ${check} 個模型較不確定（紅框），建議優先檢查。` + (nofont ? `有 ${nofont} 個字的讀音字型無法顯示（紅色波浪線）。` : '');
 }
 const keyOf = (li, ci, c) => `${li}:${ci}:${c}`;
-const isPoly = (r) => r.src === 'model' && r.cands && r.cands.length > 1;
+// 字型模式下，只有字型裡真的能切換讀音的字才算破音字（例如「學」字型只有一個讀音）
+const isPoly = (r) => r.src === 'model' && r.cands && r.cands.length > 1 && (state.mode !== 'font' || (fontData.readings[r.c]?.length || 0) > 1);
 const needsCheck = (r, li, ci) => isPoly(r) && r.conf < CHECK_BELOW && !(keyOf(li, ci, r.c) in state.overrides);
 
 function esc(s) { return s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
@@ -189,6 +236,11 @@ function zyHTML(p) {
 
 function cellHTML(r, li, ci) {
   const k = keyOf(li, ci, r.c);
+  if (r.src === 'model' && !r.p) {   // 還在等模型判斷
+    return state.mode === 'font'
+      ? `<span class="fc pend" data-k="${k}" title="判斷中…">${esc(r.c)}</span>`
+      : `<span class="cell pend" data-k="${k}" title="判斷中…"><span class="han">${esc(r.c)}</span><span class="zy"></span></span>`;
+  }
   const ov = state.overrides[k];
   const p = ov || r.p;
   if (state.mode === 'font') {
@@ -319,11 +371,11 @@ function applyReading(p) {
 }
 
 $('sheet').addEventListener('click', (e) => {
-  const el = e.target.closest('[data-k]');
+  const el = e.target.closest('[data-k]:not(.pend)');
   if (el) openPop(el);
 });
 $('sheet').addEventListener('keydown', (e) => {
-  const el = e.target.closest('[data-k]');
+  const el = e.target.closest('[data-k]:not(.pend)');
   if (el && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openPop(el); }
 });
 $('popList').addEventListener('click', (e) => {
@@ -367,13 +419,121 @@ function restore() {
     if (d) {
       $('src').value = d.text || '';
       state.overrides = d.overrides || {};
-      if (d.fontSize) $('fontSize').value = d.fontSize;
+      if (d.fontSize && [...$('fontSize').options].some((o) => o.value === d.fontSize)) $('fontSize').value = d.fontSize;
       if (d.markMode && d.markV2) $('markMode').value = d.markMode;
       if (d.renderMode) $('renderMode').value = d.renderMode;
     }
   } catch { /* ignore */ }
   applyView();
 }
+
+// ---------- 在結果畫面直接修改文字 ----------
+function charMap(a, b) {
+  // map[i] = 舊文字第 i 個字在新文字的位置（被刪掉或改掉的字為 -1）
+  const map = new Int32Array(a.length).fill(-1);
+  let pre = 0;
+  while (pre < a.length && pre < b.length && a[pre] === b[pre]) { map[pre] = pre; pre++; }
+  let suf = 0;
+  while (suf < a.length - pre && suf < b.length - pre && a[a.length - 1 - suf] === b[b.length - 1 - suf]) { map[a.length - 1 - suf] = b.length - 1 - suf; suf++; }
+  const n = a.length - pre - suf, m = b.length - pre - suf;
+  if (!n || !m || n * m > 6e6) return map;
+  const W = m + 1, L = new Uint16Array((n + 1) * W);
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) {
+    L[i * W + j] = a[pre + i] === b[pre + j] ? L[(i + 1) * W + j + 1] + 1 : Math.max(L[(i + 1) * W + j], L[i * W + j + 1]);
+  }
+  let i = 0, j = 0;
+  while (i < n && j < m) {
+    if (a[pre + i] === b[pre + j]) { map[pre + i] = pre + j; i++; j++; }
+    else if (L[(i + 1) * W + j] >= L[i * W + j + 1]) i++;
+    else j++;
+  }
+  return map;
+}
+function clusters(text) {
+  const out = [];
+  for (const ch of text) {
+    const cp = ch.codePointAt(0);
+    if (cp >= 0xE0100 && cp <= 0xE01EF && out.length) { out[out.length - 1].vs += ch; continue; }
+    out.push({ base: ch, vs: '' });
+  }
+  return out;
+}
+const flatKeys = (chars) => { const ks = []; let li = 0, ci = 0; for (const c of chars) { if (c === '\n') { ks.push(null); li++; ci = 0; } else ks.push(keyOf(li, ci++, c)); } return ks; };
+
+function renderMirror() {
+  const cur = clusters($('editor').value);
+  const map = charMap(state.editOrig.bases, cur.map((c) => c.base));
+  const inv = new Int32Array(cur.length).fill(-1);
+  map.forEach((j, i) => { if (j >= 0) inv[j] = i; });
+  let html = '';
+  cur.forEach((c, j) => {
+    const t = esc(c.base + c.vs);
+    const kind = inv[j] >= 0 ? state.editOrig.kinds[inv[j]] : (HAN_RE.test(c.base) ? 'pending' : '');
+    html += kind ? `<span class="${kind}">${t}</span>` : t;
+  });
+  $('mirror').innerHTML = html + ' ';
+  $('mirror').scrollTop = $('editor').scrollTop;
+}
+
+function startEdit() {
+  if (!state.complete || state.editing) return;
+  closePop();
+  state.editing = true;
+  const bases = [], kinds = [];
+  const mark = $('markMode').value;
+  state.lines.forEach((line, li) => {
+    if (li) { bases.push('\n'); kinds.push(''); }
+    line.forEach((r, ci) => {
+      bases.push(r.c);
+      let kind = '';
+      if (keyOf(li, ci, r.c) in state.overrides) kind = 'edited';
+      else if (needsCheck(r, li, ci) && mark !== 'none') kind = 'check';
+      else if (isPoly(r) && mark === 'all') kind = 'poly';
+      kinds.push(kind);
+    });
+  });
+  state.editOrig = { bases, kinds };
+  $('editor').value = ivsLines().join('\n');
+  $('sheet').hidden = true;
+  $('editwrap').hidden = false;
+  renderMirror();
+  $('editBtn').textContent = '修改好了，重新判斷';
+  for (const b of ['printBtn', 'copyBtn', 'runBtn']) $(b).disabled = true;
+  setStats('直接修改文字。新打的字用灰色虛線框標出，改好後按「修改好了，重新判斷」，按 Esc 放棄修改。');
+  $('editor').focus();
+  $('editor').setSelectionRange(0, 0);
+}
+
+function endEdit(apply) {
+  if (!state.editing) return;
+  state.editing = false;
+  const oldText = state.srcLines.join('\n');
+  const newText = $('editor').value.replace(/\r\n?/g, '\n').replace(IVS_ALL, '');
+  $('editwrap').hidden = true;
+  $('sheet').hidden = false;
+  $('editBtn').textContent = '修改文字';
+  for (const b of ['printBtn', 'copyBtn', 'runBtn']) $(b).disabled = false;
+  if (!apply || newText === oldText) { setStats(countText()); return; }
+  // 沒改到的字，保留你選過的讀音
+  const a = Array.from(oldText), b = Array.from(newText);
+  const map = charMap(a, b);
+  const oldKeys = flatKeys(a), newKeys = flatKeys(b);
+  const next = {};
+  oldKeys.forEach((k, i) => { if (k && k in state.overrides && map[i] >= 0 && newKeys[map[i]]) next[newKeys[map[i]]] = state.overrides[k]; });
+  state.overrides = next;
+  $('src').value = newText;
+  run();
+}
+
+let mirrorQueued = false;
+$('editor').addEventListener('input', () => {
+  if (mirrorQueued) return;
+  mirrorQueued = true;
+  requestAnimationFrame(() => { mirrorQueued = false; renderMirror(); });
+});
+$('editor').addEventListener('scroll', () => { $('mirror').scrollTop = $('editor').scrollTop; });
+$('editor').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); endEdit(false); } });
+$('editBtn').addEventListener('click', () => (state.editing ? endEdit(true) : startEdit()));
 
 $('runBtn').addEventListener('click', run);
 $('src').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) run(); });

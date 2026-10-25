@@ -143,19 +143,44 @@ export class Engine {
   }
 
   // lines：字串陣列 → 每行每字的 { c, p, src, conf?, cands? }
-  async convert(lines, onProgress) {
+  // hooks.onPlan({ lines, total })：開始判斷前，先給「每個字的初步結果」和破音字總數
+  // hooks.onPartial({ results: [[行, 字, {p,conf,cands}], ...], done, total })：每判斷完一批就回報
+  async convert(lines, onProgress, hooks = {}) {
     if (this.memo.size > 20000) this.memo.clear();
     const prepared = lines.map(l => this.g.prepareLine(l));
+    const posOf = new Map(); // key → 文字中所有出現的位置
+    let total = 0;
+    prepared.forEach((pl, li) => pl.queries.forEach(q => {
+      total++;
+      if (!posOf.has(q.key)) posOf.set(q.key, []);
+      posOf.get(q.key).push([li, q.index]);
+    }));
+    hooks.onPlan?.({ lines: prepared.map(pl => pl.result), total });
+
+    let done = 0;
+    const report = (keys) => {
+      if (!hooks.onPartial || !keys.length) return;
+      const results = [];
+      for (const k of keys) { const d = this.memo.get(k); for (const [li, ci] of posOf.get(k)) results.push([li, ci, { p: d.p, conf: d.conf, cands: d.cands }]); }
+      done += results.length;
+      hooks.onPartial({ results, done, total });
+    };
+
+    // 之前判斷過的直接回報；其餘照文章順序判斷，畫面會由上往下更新
     const todo = new Map();
-    for (const pl of prepared) for (const q of pl.queries) if (!this.memo.has(q.key) && !todo.has(q.key)) todo.set(q.key, q);
+    const cached = [];
+    for (const pl of prepared) for (const q of pl.queries) {
+      if (this.memo.has(q.key)) { if (!cached.includes(q.key) && !todo.has(q.key)) cached.push(q.key); }
+      else if (!todo.has(q.key)) todo.set(q.key, q);
+    }
+    report(cached);
     const list = [...todo.values()];
-    // 長度相近的放同一批，減少補零
-    list.sort((a, b) => a.inputIds.length - b.inputIds.length);
     for (let i = 0; i < list.length; i += BATCH) {
       const batch = list.slice(i, i + BATCH);
       const res = await this._run(batch);
       batch.forEach((q, k) => this.memo.set(q.key, res[k]));
       onProgress?.({ done: Math.min(i + BATCH, list.length), total: list.length });
+      report(batch.map(q => q.key));
     }
     return prepared.map(pl => {
       const out = pl.result.map(r => ({ ...r }));
