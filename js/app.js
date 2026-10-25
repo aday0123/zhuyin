@@ -1,4 +1,5 @@
 import { splitPron, parsePron } from './g2pw-core.js';
+import { setupWorksheet } from './worksheet.js';
 
 const $ = (id) => document.getElementById(id);
 const CHECK_BELOW = 0.9;            // 模型信心低於這個值就標黃色
@@ -610,4 +611,5 @@ $('clearBtn').addEventListener('click', async () => {
   setStats('已刪除模型。');
 });
 
+setupWorksheet({ call, ensureModel, loadFontData, fontData, waitFont, setStats });
 init();

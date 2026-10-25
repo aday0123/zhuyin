@@ -8,6 +8,7 @@
 <!-- 讓 GitHub Pages 也能開啟多執行緒（加快推論）；必須是第一個載入的腳本 -->
 <script src="coi-serviceworker.min.js"></script>
 <link rel="stylesheet" href="css/style.css">
+<style id="wsPageStyle"></style>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%231f3d33'/%3E%3Ctext x='26' y='46' font-size='34' fill='white' font-family='serif'%3E%E6%B3%A8%3C/text%3E%3Ctext x='50' y='30' font-size='13' fill='%23e05a4f'%3E%E3%84%93%3C/text%3E%3C/svg%3E">
 </head>
 <body>
@@ -25,6 +26,7 @@
       <button id="copyBtn" type="button" disabled>複製到 Word</button>
       <button id="printBtn" type="button" disabled>列印</button>
     </div>
+    <button id="wsOpenBtn" type="button" class="ws-open-btn">看注音寫國字學習單</button>
 
     <div class="copytip" id="copyTip" hidden>
       <p><strong>已複製。</strong>在 Word 貼上後，如果只看到國字，請把字型改成「ㄅ字嗨注音標楷」。</p>
@@ -106,6 +108,54 @@
     <button type="submit">套用</button>
   </form>
   <button class="pop-reset" id="popReset" type="button">還原自動判斷</button>
+</div>
+
+<!-- 看注音寫國字：輸入視窗 -->
+<div class="wsdlg-back" id="wsDialog" hidden>
+  <div class="wsdlg" role="dialog" aria-modal="true" aria-labelledby="wsDlgTitle">
+    <h2 id="wsDlgTitle">看注音寫國字學習單</h2>
+    <p class="wsdlg-sub">左欄填每一課的課文或語詞（可以用「。」或換行分開），右欄填這一課的生字。產生後，生字會挖空成格子，旁邊保留注音。</p>
+    <div class="wsdlg-opts">
+      <label class="wst-label">學習單標題 <input id="wsTitle" placeholder="例：翰林 第一課到第六課 生字圈詞"></label>
+      <label>字級
+        <select id="wsSize"><option value="s">小</option><option value="m" selected>中</option><option value="l">大</option></select>
+      </label>
+      <fieldset class="wsdlg-orient"><legend>紙張</legend>
+        <label><input type="radio" name="wsOrient" value="landscape" checked> A4 橫式</label>
+        <label><input type="radio" name="wsOrient" value="portrait"> A4 直式</label>
+      </fieldset>
+    </div>
+    <div class="wsdlg-table">
+      <table>
+        <thead><tr><th scope="col">課別</th><th scope="col">課文或語詞</th><th scope="col">生字</th></tr></thead>
+        <tbody id="wsRows"></tbody>
+      </table>
+    </div>
+    <div class="wsdlg-foot">
+      <button type="button" id="wsClear" class="linkish">清除表格</button>
+      <p class="wsdlg-msg" id="wsMsg" aria-live="polite"></p>
+      <button type="button" id="wsCancel">取消</button>
+      <button type="button" id="wsMake" class="primary">產生學習單</button>
+    </div>
+  </div>
+</div>
+
+<!-- 看注音寫國字：預覽與列印 -->
+<div class="wsview" id="wsView" hidden>
+  <div class="wsbar">
+    <button type="button" id="wsBack">修改內容</button>
+    <label>紙張
+      <select id="wsOrientView"><option value="landscape">A4 橫式</option><option value="portrait">A4 直式</option></select>
+    </label>
+    <label>字級
+      <select id="wsSizeView"><option value="s">小</option><option value="m">中</option><option value="l">大</option></select>
+    </label>
+    <p class="wsnote" id="wsNote"></p>
+    <button type="button" id="wsPrint" class="primary">列印／存成 PDF</button>
+    <button type="button" id="wsClose" class="x" aria-label="關閉">✕</button>
+  </div>
+  <div class="wspages" id="wsPages"></div>
+  <div class="wsmenu" id="wsMenu" hidden></div>
 </div>
 
 <footer class="foot">

@@ -159,6 +159,70 @@ button.small { padding: 4px 12px; font-size: .85rem; flex: none; }
 @media (prefers-reduced-motion: reduce) { .fill { transition: none; } }
 
 /* ---- 列印：只印作業紙，不印標示 ---- */
+/* ---- 看注音寫國字學習單 ---- */
+.ws-open-btn { width: 100%; border-style: dashed; }
+.wsdlg-back { position: fixed; inset: 0; z-index: 40; background: rgba(31,61,51,.35); display: grid; place-items: center; padding: 16px; }
+.wsdlg { background: #fff; border-radius: 10px; width: min(980px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column; padding: 18px 20px; box-shadow: 0 12px 40px rgba(0,0,0,.25); }
+.wsdlg h2 { margin: 0 0 4px; font-size: 1.2rem; }
+.wsdlg-sub { margin: 0 0 12px; font-size: .9rem; color: var(--ink-soft); }
+.wsdlg-opts { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; margin-bottom: 12px; }
+.wsdlg-opts label { display: flex; align-items: center; gap: 6px; }
+.wst-label { flex: 1 1 320px; }
+.wst-label input { flex: 1; border: 1px solid var(--rule); border-radius: 6px; padding: 6px 8px; font: inherit; }
+.wsdlg-orient { border: 0; margin: 0; padding: 0; display: flex; gap: 12px; align-items: center; }
+.wsdlg-orient legend { float: left; padding: 0; margin-right: 6px; }
+.wsdlg-table { overflow: auto; min-height: 0; border: 1px solid var(--rule); border-radius: 8px; }
+.wsdlg table { width: 100%; border-collapse: collapse; }
+.wsdlg th, .wsdlg td { border-bottom: 1px solid var(--rule); padding: 6px 8px; vertical-align: top; }
+.wsdlg thead th { position: sticky; top: 0; background: #eef5f0; text-align: left; font-size: .9rem; }
+.wsdlg tbody th { white-space: nowrap; font-weight: 700; padding-top: 12px; }
+.wsdlg td:nth-child(2) { width: 62%; }
+.wsdlg textarea { width: 100%; border: 1px solid var(--rule); border-radius: 6px; padding: 6px 8px; resize: vertical; font: 17px/1.6 var(--han-font); }
+.wsdlg-foot { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.wsdlg-msg { flex: 1; margin: 0; font-size: .9rem; color: var(--pen); }
+
+.wsview { position: fixed; inset: 0; z-index: 35; background: #d7dfd9; display: flex; flex-direction: column; }
+.wsbar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: #fff; border-bottom: 1px solid var(--rule); flex-wrap: wrap; }
+.wsbar label { display: flex; align-items: center; gap: 6px; }
+.wsnote { flex: 1; margin: 0; font-size: .85rem; color: var(--ink-soft); min-width: 200px; }
+.wsbar .x { border: 0; font-size: 1.1rem; }
+.wspages { flex: 1; overflow: auto; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 20px; }
+.wspage { flex: none; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.15); display: flex; flex-direction: row-reverse; padding: 10mm; gap: 3mm; overflow: hidden; color: #111; }
+.wsside { flex: none; width: 14mm; border-left: .4mm solid #9fb8a8; display: flex; flex-direction: column; align-items: center; padding: 2mm 0; gap: 4mm; }
+.wst { display: flex; flex-direction: column; align-items: center; font: 600 5.2mm/1.25 var(--ui-font); flex: 1; overflow: hidden; }
+.wst > span, .wsn > span { display: block; height: 1.25em; }
+.wsn { display: flex; flex-direction: column; align-items: center; font: 4.5mm/1.4 var(--ui-font); padding-bottom: 32mm; border-bottom: .3mm solid #333; }
+.wsp { font: 3mm var(--ui-font); color: #666; }
+.wscols { flex: 1; display: flex; flex-direction: row-reverse; justify-content: flex-start; }
+.wscol { width: var(--cw); display: flex; flex-direction: column; }
+.wc { height: var(--rh); flex: none; display: flex; align-items: center; font: var(--s)/1 "BpmfZihiKai", var(--han-font); }
+.wc.num { font-weight: 700; }
+.wc.plain { width: 1em; justify-content: center; font-family: var(--han-font); }
+.wc.punct { align-items: flex-start; justify-content: flex-end; padding: .05em .05em 0 0; }
+.wc.hid .box { width: var(--s); height: var(--s); flex: none; border: .35mm solid #333; box-sizing: border-box;
+  background:
+    linear-gradient(to right, transparent calc(50% - .1mm), #bbb calc(50% - .1mm), #bbb calc(50% + .1mm), transparent calc(50% + .1mm)),
+    linear-gradient(to bottom, transparent calc(50% - .1mm), #bbb calc(50% - .1mm), #bbb calc(50% + .1mm), transparent calc(50% + .1mm)); }
+.wc.hid .zy { font-family: var(--han-font); font-size: calc(var(--s) * .34); width: 1.5em; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; color: #111; padding-right: .3em; }
+.wc.pick { cursor: pointer; border-radius: 1mm; }
+.wc.pick:hover { background: #eef5f0; }
+.wc.low { box-shadow: inset 0 0 0 .5mm var(--pen); border-radius: 1mm; }
+.wsmenu { position: fixed; z-index: 45; background: #fff; border: 1px solid var(--rule); border-radius: 8px; box-shadow: 0 6px 24px rgba(31,61,51,.2); padding: 8px; display: flex; flex-direction: column; gap: 4px; min-width: 170px; }
+.wsm-h { margin: 0 0 4px; font-size: .85rem; color: var(--ink-soft); }
+.wsmenu button { display: flex; align-items: center; gap: 12px; border-color: var(--rule); padding: 4px 10px; text-align: left; }
+.wsmenu button[aria-pressed="true"] { border-color: var(--ink); background: #eef5f0; }
+.wsm-c { font: 28px/1.2 "BpmfZihiKai", var(--han-font); }
+
+@media print {
+  body.ws-open > *:not(#wsView) { display: none !important; }
+  body.ws-open .wsview { position: static; display: block; background: #fff; }
+  body.ws-open .wsbar, body.ws-open .wsmenu { display: none !important; }
+  body.ws-open .wspages { display: block; padding: 0; overflow: visible; }
+  body.ws-open .wspage { box-shadow: none; break-after: page; margin: 0; }
+  body.ws-open .wspage:last-child { break-after: auto; }
+  body.ws-open .wc.low, body.ws-open .wc.pick { box-shadow: none !important; background: none !important; }
+}
+
 @media print {
   @page { size: A4; margin: 15mm; }
   body { background: #fff; }
