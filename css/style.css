@@ -203,7 +203,18 @@ button.small { padding: 4px 12px; font-size: .85rem; flex: none; }
   background:
     linear-gradient(to right, transparent calc(50% - .1mm), #bbb calc(50% - .1mm), #bbb calc(50% + .1mm), transparent calc(50% + .1mm)),
     linear-gradient(to bottom, transparent calc(50% - .1mm), #bbb calc(50% - .1mm), #bbb calc(50% + .1mm), transparent calc(50% + .1mm)); }
-.wc.hid .zy { font-family: var(--han-font); font-size: calc(var(--s) * .34); width: 1.5em; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; color: #111; padding-right: .3em; }
+.wc.hid .zy { font-family: var(--han-font); font-size: calc(var(--s) * .34); min-width: 1.6em; display: flex; flex-direction: row; align-items: center; justify-content: flex-start; line-height: 1; color: #111; padding: 0 .2em 0 .15em; }
+.wc.hid .zy .sy { display: flex; flex-direction: column; align-items: center; }
+.wc.hid .zy .sy i { font-style: normal; display: block; }
+.wc.hid .zy .qs { display: block; height: .5em; line-height: .3; text-align: center; font-weight: 400; }
+.wc.hid .zy .tm { font-weight: 400; font-size: .9em; margin-left: .05em; position: relative; top: .3em; }
+/* 字嗨字型加 U+E01E0 = 只有國字、不帶注音的標楷字形 */
+.wc.zq .hz { font-family: "BpmfZihiKai", var(--han-font); width: 1em; overflow: hidden; white-space: nowrap; flex: none; }
+.wc.zq .zbox { width: calc(var(--s) * .48); height: calc(var(--s) * 1.1); border: .35mm solid #333; box-sizing: border-box; margin-left: .08em; flex: none; }
+.wc.ans { color: #c0392b; }
+.wsprint { max-width: 420px; }
+.wspm { display: flex; align-items: center; gap: 10px; font-size: 1.1rem; padding: 6px 0; }
+.wspm input { width: 20px; height: 20px; }
 .wc.pick { cursor: pointer; border-radius: 1mm; }
 .wc.pick:hover { background: #eef5f0; }
 .wc.low { box-shadow: inset 0 0 0 .5mm var(--pen); border-radius: 1mm; }

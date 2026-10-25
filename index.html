@@ -114,11 +114,11 @@
 <div class="wsdlg-back" id="wsDialog" hidden>
   <div class="wsdlg" role="dialog" aria-modal="true" aria-labelledby="wsDlgTitle">
     <h2 id="wsDlgTitle">看注音寫國字學習單</h2>
-    <p class="wsdlg-sub">左欄填每一課的課文或語詞（可以用「。」或換行分開），右欄填這一課的生字。產生後，生字會挖空成格子，旁邊保留注音。</p>
+    <p class="wsdlg-sub">左欄填每一課的課文或語詞（可以用「。」或換行分開），右欄填這一課的生字。也可以從 Excel 選取兩欄一起複製，貼到第一課的左格，會自動填滿整個表格。產生後，生字會挖空成格子，旁邊保留注音。</p>
     <div class="wsdlg-opts">
       <label class="wst-label">學習單標題 <input id="wsTitle" placeholder="例：翰林 第一課到第六課 生字圈詞"></label>
-      <label>字級
-        <select id="wsSize"><option value="s">小</option><option value="m" selected>中</option><option value="l">大</option></select>
+      <label>字級（點）
+        <select id="wsSize"></select>
       </label>
       <fieldset class="wsdlg-orient"><legend>紙張</legend>
         <label><input type="radio" name="wsOrient" value="landscape" checked> A4 橫式</label>
@@ -147,15 +147,29 @@
     <label>紙張
       <select id="wsOrientView"><option value="landscape">A4 橫式</option><option value="portrait">A4 直式</option></select>
     </label>
-    <label>字級
-      <select id="wsSizeView"><option value="s">小</option><option value="m">中</option><option value="l">大</option></select>
+    <label>字級（點）
+      <select id="wsSizeView"></select>
     </label>
     <p class="wsnote" id="wsNote"></p>
-    <button type="button" id="wsPrint" class="primary">列印／存成 PDF</button>
+    <button type="button" id="wsPrint" class="primary">讀音確定，輸出作業單</button>
     <button type="button" id="wsClose" class="x" aria-label="關閉">✕</button>
   </div>
   <div class="wspages" id="wsPages"></div>
   <div class="wsmenu" id="wsMenu" hidden></div>
+  <div class="wsdlg-back" id="wsPrintDlg" hidden>
+    <div class="wsdlg wsprint" role="dialog" aria-modal="true" aria-labelledby="wsPrintTitle">
+      <h2 id="wsPrintTitle">要輸出哪幾種作業單？</h2>
+      <p class="wsdlg-sub">勾選的會接在一起，在列印視窗選「另存為 PDF」就會存成一個 PDF 檔。</p>
+      <label class="wspm"><input type="checkbox" id="wsPm_zy2hz" checked> 看注音寫國字</label>
+      <label class="wspm"><input type="checkbox" id="wsPm_hz2zy" checked> 看國字寫注音</label>
+      <label class="wspm"><input type="checkbox" id="wsPm_ans" checked> 答案卷</label>
+      <div class="wsdlg-foot">
+        <p class="wsdlg-msg" id="wsPrintMsg" aria-live="polite"></p>
+        <button type="button" id="wsPrintCancel">取消</button>
+        <button type="button" id="wsPrintGo" class="primary">輸出</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <footer class="foot">

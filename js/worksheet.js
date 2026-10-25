@@ -2,11 +2,13 @@
 import { splitPron, parsePron } from './g2pw-core.js';
 
 const STORE = 'zhuyin-worksheet-v1';
-const NUMS = ['一', '二', '三', '四', '五', '六'];
+const NUMS = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二'];
 const CHECK_BELOW = 0.9;
 const IVS_ALL = /[\u{E0100}-\u{E01EF}]/gu;
 const HAN = /^\p{Script=Han}$/u;
-const SIZES = { s: 8, m: 10, l: 12 };                 // 國字大小（mm）
+const PT = 0.3528;                                     // 1 點 = 0.3528 mm
+const OLD_SIZES = { s: 22, m: 28, l: 34 };             // 舊版存的「小中大」換成點數
+const sizePt = (v) => { const n = Number(OLD_SIZES[v] ?? v); return n >= 14 && n <= 60 ? n : 28; };
 const PAGE = { portrait: [210, 297], landscape: [297, 210] };
 const MARGIN = 10, SIDEBAR = 16;                       // mm
 
@@ -16,18 +18,26 @@ const vs = (i) => (i > 0 ? String.fromCodePoint(0xE01E0 + i) : '');
 const vText = (t) => Array.from(t).map((c) => `<span>${c === ' ' ? '&nbsp;' : esc(c)}</span>`).join('');
 const isPunct = (c) => /^[\p{P}\p{S}]$/u.test(c);
 
+// 注音直排：符號一欄，聲調放在右邊、對齊整串符號的正中間
 function zyStack(p) {
   const sp = splitPron(p);
   if (!sp) return '';
-  const syms = Array.from(sp.base);
   const mark = { 2: 'ˊ', 3: 'ˇ', 4: 'ˋ' }[sp.tone] || '';
-  let h = sp.tone === '5' ? '<b class="qs">˙</b>' : '';
-  syms.forEach((s, i) => { h += `<i>${esc(s)}${i === syms.length - 1 && mark ? `<b class="tn">${mark}</b>` : ''}</i>`; });
-  return h;
+  const dot = sp.tone === '5' ? '<b class="qs">˙</b>' : '';
+  const syms = Array.from(sp.base).map((c) => `<i>${esc(c)}</i>`).join('');
+  return `<span class="sy">${dot}${syms}</span>${mark ? `<b class="tm">${mark}</b>` : ''}`;
 }
 
 export function setupWorksheet({ call, ensureModel, loadFontData, fontData, waitFont, setStats }) {
   const ws = { tokens: [], data: null, menuFor: null };
+
+  // ---------- 字級選單：14～60 點，另外標出小、中、大 ----------
+  const sizeOpts = Array.from({ length: 24 }, (_, k) => 14 + k * 2).map((n) => {
+    const tag = { 22: '（小）', 28: '（中）', 34: '（大）' }[n] || '';
+    return `<option value="${n}"${n === 28 ? ' selected' : ''}>${n}${tag}</option>`;
+  }).join('');
+  $('wsSize').innerHTML = sizeOpts;
+  $('wsSizeView').innerHTML = sizeOpts;
 
   // ---------- 輸入視窗 ----------
   const rows = $('wsRows');
@@ -49,7 +59,7 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
   function writeForm(d) {
     if (!d) return;
     $('wsTitle').value = d.title || '';
-    if (d.size) $('wsSize').value = d.size;
+    if (d.size) $('wsSize').value = String(sizePt(d.size));
     const o = document.querySelector(`input[name="wsOrient"][value="${d.orient}"]`);
     if (o) o.checked = true;
     (d.lessons || []).forEach((l, i) => { if ($(`wsText${i}`)) { $(`wsText${i}`).value = l.text || ''; $(`wsChars${i}`).value = l.chars || ''; } });
@@ -65,6 +75,47 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
     NUMS.forEach((_, i) => { $(`wsText${i}`).value = ''; $(`wsChars${i}`).value = ''; });
     saveForm();
   });
+  // 從 Excel／Google 試算表複製兩欄（課文、生字）貼上，自動往下填滿表格
+  function parseTSV(text) {
+    const out = []; let row = [], cell = '', i = 0, q = false;
+    text = text.replace(/\r\n?/g, '\n');
+    while (i < text.length) {
+      const c = text[i];
+      if (q) {
+        if (c === '"' && text[i + 1] === '"') { cell += '"'; i += 2; continue; }
+        if (c === '"') { q = false; i++; continue; }
+        cell += c; i++; continue;
+      }
+      if (c === '"' && cell === '') { q = true; i++; continue; }
+      if (c === '\t') { row.push(cell); cell = ''; i++; continue; }
+      if (c === '\n') { row.push(cell); out.push(row); row = []; cell = ''; i++; continue; }
+      cell += c; i++;
+    }
+    if (cell !== '' || row.length) { row.push(cell); out.push(row); }
+    return out.filter((r) => r.some((x) => x.trim()));
+  }
+  rows.addEventListener('paste', (e) => {
+    const ta = e.target.closest('textarea');
+    const text = e.clipboardData?.getData('text/plain') || '';
+    if (!ta || !text.includes('\t')) return;           // 一般貼上（沒有 Tab）照原本方式
+    e.preventDefault();
+    const m = ta.id.match(/^ws(Text|Chars)(\d+)$/);
+    const startRow = Number(m[2]), startCol = m[1] === 'Text' ? 0 : 1;
+    const data = parseTSV(text);
+    let n = 0;
+    data.forEach((r, k) => {
+      const ri = startRow + k;
+      if (ri >= NUMS.length) return;
+      r.slice(0, 2 - startCol).forEach((v, c) => {
+        $(`${startCol + c === 0 ? 'wsText' : 'wsChars'}${ri}`).value = v.trim();
+      });
+      n++;
+    });
+    const over = data.length - n;
+    $('wsMsg').textContent = `已填入 ${n} 課。` + (over > 0 ? `還有 ${over} 列超過第十二課，沒有填入。` : '');
+    saveForm();
+  });
+
   $('wsDialog').addEventListener('keydown', (e) => { if (e.key === 'Escape') $('wsDialog').hidden = true; });
 
   // 每一課的文字：換行當作分隔，沒有標點的行尾補「。」
@@ -90,7 +141,7 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
       const res = await call('convert', { lines: lessons.map((l) => l.text) });
       ws.tokens = [];
       lessons.forEach((l, li) => {
-        ws.tokens.push({ kind: 'num', c: l.num, p: null });
+        Array.from(l.num).forEach((c, k) => ws.tokens.push({ kind: k ? 'num2' : 'num', c, p: null }));
         res.lines[li].forEach((r) => {
           ws.tokens.push({
             kind: 'char', c: r.c, p: r.p, conf: r.src === 'model' && r.cands?.length > 1 ? r.conf : 1,
@@ -101,10 +152,10 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
       ws.data = d;
       $('wsDialog').hidden = true;
       $('wsOrientView').value = d.orient;
-      $('wsSizeView').value = d.size;
+      $('wsSizeView').value = String(sizePt(d.size));
       openView();
       const notFound = lessons.flatMap((l) => [...l.chars].filter((c) => !l.text.includes(c)).map((c) => `第${l.num}課「${c}」`));
-      let msg = '點有紅框的字可以確認讀音，也可以點任何多音字換讀音。';
+      let msg = '請先檢查讀音（紅字是生字）。點字可以換讀音，有紅框的字建議優先確認。改好後按右邊的按鈕輸出作業單。';
       if (missing.length) msg = `${missing.join('、')} 沒有填生字，這幾課不會挖空。` + msg;
       if (notFound.length) msg = `這些生字在課文裡找不到：${notFound.slice(0, 6).join('、')}${notFound.length > 6 ? '…' : ''}。` + msg;
       $('wsNote').textContent = msg;
@@ -124,7 +175,7 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
 
   function layout() {
     const [pw, ph] = PAGE[ws.data.orient];
-    const s = SIZES[ws.data.size] || SIZES.m;
+    const s = sizePt(ws.data.size) * PT;
     const rowH = s * 1.22, colW = s * 1.72;
     const nRows = Math.max(4, Math.floor((ph - 2 * MARGIN) / rowH));
     const nCols = Math.max(2, Math.floor((pw - 2 * MARGIN - SIDEBAR - 3) / colW));
@@ -144,25 +195,39 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
     return { pages, pw, ph, s, rowH, colW, nRows };
   }
 
-  function cellHTML(t, i) {
+  // mode: 'zy2hz' 看注音寫國字、'hz2zy' 看國字寫注音、'ans' 答案卷
+  function cellHTML(t, i, mode) {
     const red = t.kind === 'char' && t.conf < CHECK_BELOW ? ' low' : '';
     const pick = t.kind === 'char' && (fontData.readings[t.c]?.length || 0) > 1 ? ' pick' : '';
-    if (t.kind === 'num') return `<div class="wc num">${esc(t.c)}</div>`;
-    if (t.hide) {
+    if (t.kind === 'num' || t.kind === 'num2') return `<div class="wc num">${esc(t.c)}</div>`;
+    if (t.hide && mode === 'zy2hz') {
       return `<div class="wc hid${red}${pick}" data-i="${i}"><span class="box"></span><span class="zy">${zyStack(t.p)}</span></div>`;
     }
+    if (t.hide && mode === 'hz2zy') {
+      return `<div class="wc zq${red}${pick}" data-i="${i}"><span class="hz">${esc(t.c)}\u{E01E0}</span><span class="zbox"></span></div>`;
+    }
     if (!t.p) return `<div class="wc plain${isPunct(t.c) ? ' punct' : ''}">${esc(t.c)}</div>`;
-    return `<div class="wc ch${red}${pick}" data-i="${i}">${esc(t.c)}${vs(idxOf(t.c, t.p))}</div>`;
+    const ans = t.hide && mode === 'ans' ? ' ans' : '';
+    return `<div class="wc ch${ans}${red}${pick}" data-i="${i}">${esc(t.c)}${vs(idxOf(t.c, t.p))}</div>`;
   }
 
-  function render() {
+  const MODES = { zy2hz: '看注音寫國字', hz2zy: '看國字寫注音', ans: '答案卷' };
+
+  function pagesHTML(mode) {
     const L = layout();
-    const title = ws.data.title || '看注音寫國字';
-    $('wsPages').innerHTML = L.pages.map((cols, pi) => `
-      <section class="wspage" style="width:${L.pw}mm;height:${L.ph}mm;--s:${L.s}mm;--rh:${L.rowH}mm;--cw:${L.colW}mm">
-        <aside class="wsside"><span class="wst">${vText(title)}</span><span class="wsn">${vText('姓名')}</span>${L.pages.length > 1 ? `<span class="wsp">${pi + 1}/${L.pages.length}</span>` : ''}</aside>
-        <div class="wscols">${cols.map((c) => `<div class="wscol">${c.map((i) => cellHTML(ws.tokens[i], i)).join('')}</div>`).join('')}</div>
+    const base = ws.data.title || '';
+    const title = base ? `${base}　${MODES[mode]}` : MODES[mode];
+    return L.pages.map((cols, pi) => `
+      <section class="wspage" data-mode="${mode}" style="width:${L.pw}mm;height:${L.ph}mm;--s:${L.s}mm;--rh:${L.rowH}mm;--cw:${L.colW}mm">
+        <aside class="wsside"><span class="wst">${vText(title)}</span>${mode === 'ans' ? '' : `<span class="wsn">${vText('姓名')}</span>`}${L.pages.length > 1 ? `<span class="wsp">${pi + 1}/${L.pages.length}</span>` : ''}</aside>
+        <div class="wscols">${cols.map((c) => `<div class="wscol">${c.map((i) => cellHTML(ws.tokens[i], i, mode)).join('')}</div>`).join('')}</div>
       </section>`).join('');
+  }
+
+  // 畫面上預覽一種；列印時把勾選的幾種接在一起
+  function render(modes) {
+    const list = modes || ['ans'];   // 畫面上先給答案卷，讓老師校對讀音
+    $('wsPages').innerHTML = list.map(pagesHTML).join('');
     $('wsPageStyle').textContent = `@page { size: A4 ${ws.data.orient}; margin: 0; }`;
   }
 
@@ -181,15 +246,29 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
 
   $('wsClose').addEventListener('click', closeView);
   $('wsBack').addEventListener('click', () => { closeView(); $('wsDialog').hidden = false; });
-  $('wsPrint').addEventListener('click', () => { closeMenu(); window.print(); });
+  // 列印：先問要印哪幾種
+  const PSTORE = 'zhuyin-worksheet-print';
+  try { const saved = JSON.parse(localStorage.getItem(PSTORE) || 'null'); if (saved) Object.keys(MODES).forEach((m) => { $(`wsPm_${m}`).checked = saved.includes(m); }); } catch { /* ignore */ }
+  $('wsPrint').addEventListener('click', () => { closeMenu(); $('wsPrintMsg').textContent = ''; $('wsPrintDlg').hidden = false; $('wsPrintGo').focus(); });
+  $('wsPrintCancel').addEventListener('click', () => { $('wsPrintDlg').hidden = true; });
+  $('wsPrintGo').addEventListener('click', () => {
+    const modes = Object.keys(MODES).filter((m) => $(`wsPm_${m}`).checked);
+    if (!modes.length) { $('wsPrintMsg').textContent = '請至少勾選一種。'; return; }
+    try { localStorage.setItem(PSTORE, JSON.stringify(modes)); } catch { /* ignore */ }
+    $('wsPrintDlg').hidden = true;
+    render(modes);
+    setTimeout(() => { window.print(); render(); }, 50);
+  });
+
   $('wsOrientView').addEventListener('change', () => { ws.data.orient = $('wsOrientView').value; render(); });
   $('wsSizeView').addEventListener('change', () => { ws.data.size = $('wsSizeView').value; render(); });
-  $('wsView').addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (!$('wsMenu').hidden) closeMenu(); else closeView(); } });
+  $('wsView').addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (!$('wsPrintDlg').hidden) $('wsPrintDlg').hidden = true; else if (!$('wsMenu').hidden) closeMenu(); else closeView(); } });
 
   // ---------- 點字換讀音 ----------
   function closeMenu() { $('wsMenu').hidden = true; ws.menuFor = null; }
   $('wsPages').addEventListener('click', (e) => {
     const el = e.target.closest('.wc.pick');
+    if (!$('wsPrintDlg').hidden) return;
     if (!el) { closeMenu(); return; }
     const i = Number(el.dataset.i), t = ws.tokens[i];
     const list = fontData.readings[t.c] || [];
