@@ -130,7 +130,7 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
     saveForm();
     const lessons = d.lessons.map((l, i) => {
       const lines = lessonLines(l.text);
-      return { num: NUMS[i], lines, text: lines.join(''), chars: new Set(Array.from(l.chars).filter((c) => HAN.test(c))) };
+      return { row: i, num: NUMS[i], lines, text: lines.join(''), chars: new Set(Array.from(l.chars).filter((c) => HAN.test(c))) };
     }).filter((l) => l.text.trim());
     if (!lessons.length) { $('wsMsg').textContent = '請至少輸入一課的課文或語詞。'; return; }
     const missing = lessons.filter((l) => !l.chars.size).map((l) => `第${l.num}課`);
@@ -145,17 +145,18 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
       const res = await call('convert', { lines: flat });
       ws.tokens = [];
       let li = 0;
-      lessons.forEach((l) => {
-        Array.from(l.num).forEach((c, k) => ws.tokens.push({ kind: k ? 'num2' : 'num', c, p: null }));
+      ws.lessons = lessons;
+      lessons.forEach((l, lx) => {
+        Array.from(l.num).forEach((c, k) => ws.tokens.push({ kind: k ? 'num2' : 'num', c, p: null, lx }));
         let started = false, blank = false;
         l.lines.forEach((line) => {
           if (!line.trim()) { blank = true; return; }
-          if (started) ws.tokens.push({ kind: blank ? 'para' : 'br' });
+          if (started) ws.tokens.push({ kind: blank ? 'para' : 'br', lx });
           started = true; blank = false;
           res.lines[li++].forEach((r) => {
             ws.tokens.push({
               kind: 'char', c: r.c, p: r.p, conf: r.src === 'model' && r.cands?.length > 1 ? r.conf : 1,
-              hide: l.chars.has(r.c) && !!r.p,
+              hide: l.chars.has(r.c) && !!r.p, lx,
             });
           });
         });
@@ -167,7 +168,7 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
       $('wsSizeView').value = String(sizePt(d.size));
       openView();
       const notFound = lessons.flatMap((l) => [...l.chars].filter((c) => !l.text.includes(c)).map((c) => `第${l.num}課「${c}」`));
-      let msg = '請先檢查讀音（紅字是生字）。點字可以換讀音，有紅框的字建議優先確認。改好後按右邊的按鈕輸出作業單。';
+      let msg = '請先檢查（紅字是生字）。點任何一個字，可以換讀音、刪字、加字或換行；有紅框的字建議優先確認。改好後按右邊的按鈕輸出作業單。';
       if (missing.length) msg = `${missing.join('、')} 沒有填生字，這幾課不會挖空。` + msg;
       if (notFound.length) msg = `注意：有 ${notFound.length} 個生字在課文裡找不到，不會挖空，請確認生字和課文是不是同一課：${notFound.slice(0, 12).join('、')}${notFound.length > 12 ? '…' : ''}。` + msg;
       $('wsNote').textContent = msg;
@@ -250,7 +251,7 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
     if (t.hide && mode === 'hz2zy') {
       return `<div class="wc zq${red}${pick}" data-i="${i}"><span class="hz">${esc(t.c)}\u{E01E0}</span><span class="zbox"></span></div>`;
     }
-    if (!t.p) return `<div class="wc plain${isPunct(t.c) ? ' punct' : ''}">${isPunct(t.c) ? punctHTML(t.c) : esc(t.c)}</div>`;
+    if (!t.p) return `<div class="wc plain${isPunct(t.c) ? ' punct' : ''}" data-i="${i}">${isPunct(t.c) ? punctHTML(t.c) : esc(t.c)}</div>`;
     const ans = t.hide && mode === 'ans' ? ' ans' : '';
     return `<div class="wc ch${ans}${red}${pick}" data-i="${i}">${esc(t.c)}${vs(idxOf(t.c, t.p))}</div>`;
   }
@@ -309,32 +310,119 @@ export function setupWorksheet({ call, ensureModel, loadFontData, fontData, wait
   $('wsSizeView').addEventListener('change', () => { ws.data.size = $('wsSizeView').value; render(); });
   $('wsView').addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (!$('wsPrintDlg').hidden) $('wsPrintDlg').hidden = true; else if (!$('wsMenu').hidden) closeMenu(); else closeView(); } });
 
-  // ---------- 點字換讀音 ----------
+  // ---------- 點字：換讀音、刪字、加字、換行 ----------
   function closeMenu() { $('wsMenu').hidden = true; ws.menuFor = null; }
-  $('wsPages').addEventListener('click', (e) => {
-    const el = e.target.closest('.wc.pick');
-    if (!$('wsPrintDlg').hidden) return;
-    if (!el) { closeMenu(); return; }
-    const i = Number(el.dataset.i), t = ws.tokens[i];
-    const list = fontData.readings[t.c] || [];
+
+  // 把某一課改過的內容寫回輸入視窗，之後按「修改內容」也看得到
+  function syncLesson(lx) {
+    const l = ws.lessons?.[lx];
+    if (!l) return;
+    let txt = '';
+    ws.tokens.forEach((t) => {
+      if (t.lx !== lx) return;
+      if (t.kind === 'char') txt += t.c;
+      else if (t.kind === 'br') txt += '\n';
+      else if (t.kind === 'para') txt += '\n\n';
+    });
+    $(`wsText${l.row}`).value = txt;
+    saveForm();
+  }
+
+  // 找出第 i 個字所在那一行的範圍（遇到課別、換行就停）
+  function lineRange(i) {
+    let a = i, b = i;
+    while (a > 0 && ws.tokens[a - 1].kind === 'char') a--;
+    while (b < ws.tokens.length - 1 && ws.tokens[b + 1].kind === 'char') b++;
+    return [a, b + 1];
+  }
+
+  async function insertText(i, text, after) {
+    const add = Array.from(text.replace(/[\r\n]/g, '').replace(IVS_ALL, ''));
+    if (!add.length) return;
+    const t0 = ws.tokens[i];
+    const [a, b] = lineRange(i);
+    const at = after ? i + 1 : i;
+    const line = ws.tokens.slice(a, at).map((t) => t.c).join('') + add.join('') + ws.tokens.slice(at, b).map((t) => t.c).join('');
+    $('wsNote').textContent = '判斷新加的字的讀音中…';
+    const res = await call('convert', { lines: [line] });
+    const rs = res.lines[0].slice(at - a, at - a + add.length);
+    const chars = ws.lessons?.[t0.lx]?.chars || new Set();
+    const toks = rs.map((r) => ({
+      kind: 'char', c: r.c, p: r.p, conf: r.src === 'model' && r.cands?.length > 1 ? r.conf : 1,
+      hide: chars.has(r.c) && !!r.p, lx: t0.lx,
+    }));
+    ws.tokens.splice(at, 0, ...toks);
+    $('wsNote').textContent = `已加入「${add.join('')}」。`;
+    syncLesson(t0.lx);
+    render();
+  }
+
+  function showMenu(el, i) {
+    const t = ws.tokens[i];
+    const list = t.p ? (fontData.readings[t.c] || []) : [];
     const cur = splitPron(t.p)?.text;
-    $('wsMenu').innerHTML = `<p class="wsm-h">「${esc(t.c)}」要讀哪一個音？</p>` + list.map((r, k) =>
-      `<button type="button" data-k="${k}" aria-pressed="${r === cur}"><span class="wsm-c">${esc(t.c)}${vs(k)}</span>${esc(r)}</button>`).join('');
+    const next = ws.tokens[i + 1];
+    let h = '';
+    if (list.length > 1) {
+      h += `<p class="wsm-h">「${esc(t.c)}」要讀哪一個音？</p>` + list.map((r, k) =>
+        `<button type="button" data-k="${k}" aria-pressed="${r === cur}"><span class="wsm-c">${esc(t.c)}${vs(k)}</span>${esc(r)}</button>`).join('');
+    }
+    h += `<p class="wsm-h">修改文字</p>
+      <div class="wsm-add"><input id="wsAddInput" placeholder="要加的字" autocomplete="off" aria-label="要加的字">
+      <button type="button" data-act="before">加在前面</button><button type="button" data-act="after">加在後面</button></div>
+      <button type="button" data-act="del" class="wsm-del">刪除「${esc(t.c === ' ' ? '空格' : t.c)}」</button>
+      ${next && (next.kind === 'br' || next.kind === 'para')
+        ? '<button type="button" data-act="unbr">取消後面的換行</button>'
+        : '<button type="button" data-act="br">在這個字後面換行</button>'}`;
     const m = $('wsMenu');
+    m.innerHTML = h;
     m.hidden = false;
     const rect = el.getBoundingClientRect();
     m.style.left = `${Math.max(8, Math.min(rect.right + 6, innerWidth - m.offsetWidth - 8))}px`;
     m.style.top = `${Math.max(8, Math.min(rect.top, innerHeight - m.offsetHeight - 8))}px`;
     ws.menuFor = i;
-    m.querySelector('[aria-pressed="true"]')?.focus();
+    (m.querySelector('[aria-pressed="true"]') || $('wsAddInput')).focus();
+  }
+
+  $('wsPages').addEventListener('click', (e) => {
+    if (!$('wsPrintDlg').hidden) return;
+    const el = e.target.closest('.wc[data-i]');
+    if (!el) { closeMenu(); return; }
+    showMenu(el, Number(el.dataset.i));
   });
-  $('wsMenu').addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-k]');
+  $('wsMenu').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.id === 'wsAddInput' && !e.isComposing) { e.preventDefault(); $('wsMenu').querySelector('[data-act="after"]').click(); }
+  });
+  $('wsMenu').addEventListener('click', async (e) => {
+    const b = e.target.closest('button');
     if (!b || ws.menuFor == null) return;
-    const t = ws.tokens[ws.menuFor];
-    t.p = parsePron(fontData.readings[t.c][Number(b.dataset.k)]);
-    t.conf = 1;
+    const i = ws.menuFor, t = ws.tokens[i];
+    if (b.dataset.k != null) {
+      t.p = parsePron(fontData.readings[t.c][Number(b.dataset.k)]);
+      t.conf = 1;
+      closeMenu(); render(); return;
+    }
+    const act = b.dataset.act;
+    if (act === 'before' || act === 'after') {
+      const v = $('wsAddInput').value;
+      if (!v.trim()) { $('wsAddInput').focus(); return; }
+      closeMenu();
+      try { await insertText(i, v, act === 'after'); } catch (err) { $('wsNote').textContent = '加字失敗：' + err.message; }
+      return;
+    }
+    if (act === 'del') {
+      ws.tokens.splice(i, 1);
+      // 刪到一行都沒字了，就把多出來的換行一起拿掉
+      const prev = ws.tokens[i - 1], nx = ws.tokens[i];
+      if (nx && (nx.kind === 'br' || nx.kind === 'para') && (!prev || prev.kind !== 'char')) ws.tokens.splice(i, 1);
+      $('wsNote').textContent = `已刪除「${t.c}」。`;
+    } else if (act === 'br') {
+      ws.tokens.splice(i + 1, 0, { kind: 'br', lx: t.lx });
+    } else if (act === 'unbr') {
+      ws.tokens.splice(i + 1, 1);
+    }
     closeMenu();
+    syncLesson(t.lx);
     render();
   });
 }

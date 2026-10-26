@@ -232,8 +232,12 @@ button.small { padding: 4px 12px; font-size: .85rem; flex: none; }
 .wsprint { max-width: 420px; }
 .wspm { display: flex; align-items: center; gap: 10px; font-size: 1.1rem; padding: 6px 0; }
 .wspm input { width: 20px; height: 20px; }
-.wc.pick { cursor: pointer; border-radius: 1mm; }
-.wc.pick:hover { background: #eef5f0; }
+.wc[data-i] { cursor: pointer; border-radius: 1mm; }
+.wc[data-i]:hover { background: #eef5f0; }
+.wsm-add { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; max-width: 220px; }
+.wsm-add input { flex: 1 1 100%; box-sizing: border-box; border: 1px solid var(--rule); border-radius: 6px; padding: 4px 6px; font: inherit; }
+.wsmenu .wsm-add button { padding: 4px 8px; flex: 1; justify-content: center; }
+.wsmenu .wsm-del { color: var(--pen); }
 .wc.low { box-shadow: inset 0 0 0 .5mm var(--pen); border-radius: 1mm; }
 .wsmenu { position: fixed; z-index: 45; background: #fff; border: 1px solid var(--rule); border-radius: 8px; box-shadow: 0 6px 24px rgba(31,61,51,.2); padding: 8px; display: flex; flex-direction: column; gap: 4px; min-width: 170px; }
 .wsm-h { margin: 0 0 4px; font-size: .85rem; color: var(--ink-soft); }
@@ -248,7 +252,7 @@ button.small { padding: 4px 12px; font-size: .85rem; flex: none; }
   body.ws-open .wspages { display: block; padding: 0; overflow: visible; }
   body.ws-open .wspage { box-shadow: none; break-after: page; margin: 0; }
   body.ws-open .wspage:last-child { break-after: auto; }
-  body.ws-open .wc.low, body.ws-open .wc.pick { box-shadow: none !important; background: none !important; }
+  body.ws-open .wc.low, body.ws-open .wc[data-i] { box-shadow: none !important; background: none !important; }
 }
 
 @media print {
